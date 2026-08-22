@@ -1,0 +1,100 @@
+# Local development configuration.
+#
+# This file configures the LOCAL Supabase stack only (`npx supabase start`).
+# It never touches the shared cloud project — see CLAUDE.md.
+
+project_id = "pta-collections"
+
+# PORT BLOCK 547xx.
+# You run several local Supabase stacks at once; 543xx (bayugan-tracks),
+# 544xx (hris), 546xx (travelers-inn) and 555xx (point-of-sale) are taken.
+# 547xx is PTA's so all of them can run side by side.
+[api]
+enabled = true
+port = 54721
+# `pta` MUST be listed here or PostgREST returns 404 for every table.
+# The cloud project needs the same value set manually in
+# Settings -> API -> Exposed schemas.
+schemas = ["public", "graphql_public", "pta"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54722
+shadow_port = 54720
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+# Demo data for local development only. Never reaches the cloud project.
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54723
+api_url = "http://127.0.0.1:54721"
+
+# Catches every outbound email locally so nothing is actually sent.
+[inbucket]
+enabled = true
+port = 54724
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[storage.buckets.pta-school-logos]
+public = true
+file_size_limit = "2MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"]
+
+[auth]
+enabled = true
+# Where the Next.js app runs.
+site_url = "http://localhost:3000"
+additional_redirect_urls = [
+  "http://localhost:3000",
+  "http://localhost:3000/auth/callback",
+  "http://127.0.0.1:3000/auth/callback",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# This system has no passwords — Google OAuth only (v2 spec, §6).
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+# LOCAL ONLY. Production and the cloud project are Google-only — this system
+# has no passwords (v2 spec, §6). Enabled here so you can sign in without a
+# Google Cloud round-trip while developing; see NEXT_PUBLIC_ENABLE_DEV_LOGIN.
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[auth.sms]
+enable_signup = false
+
+# Google OAuth.
+#
+# Set these in supabase/.env (gitignored) before running `supabase start`:
+#   SUPABASE_AUTH_GOOGLE_CLIENT_ID=...
+#   SUPABASE_AUTH_GOOGLE_SECRET=...
+#
+# In Google Cloud Console the OAuth client must list this EXACT redirect URI:
+#   http://127.0.0.1:54721/auth/v1/callback
+# (that is the local Supabase auth server, NOT the Next.js app)
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+redirect_uri = "http://127.0.0.1:54721/auth/v1/callback"
+skip_nonce_check = false
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = false

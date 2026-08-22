@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Supabase
+supabase/.env
+supabase/.branches
+supabase/.temp
+.playwright-mcp/

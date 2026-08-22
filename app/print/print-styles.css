@@ -1,0 +1,13 @@
+/* Shared print rules. Imported by each print page. */
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff !important; }
+}
+
+@page { size: A4; margin: 12mm; }
+
+.receipt-58mm { }
+@media print {
+  .receipt-58mm-page { }
+}
