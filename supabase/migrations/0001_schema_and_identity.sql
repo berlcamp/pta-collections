@@ -14,8 +14,12 @@ alter default privileges in schema pta
 alter default privileges in schema pta
   grant usage, select on sequences to authenticated;
 
+-- pg_trgm backs the gin_trgm_ops indexes in 0002/0003. On the shared project
+-- it is already installed in `public` (pre-existing — another app or the
+-- dashboard toggle put it there). Leave it there: ALTER EXTENSION ... SET
+-- SCHEMA would invalidate the other apps' trgm indexes. IF NOT EXISTS makes
+-- this a no-op in production; it is here so a local `db reset` still works.
 create extension if not exists pg_trgm;
-create extension if not exists "uuid-ossp";
 
 -- ---------------------------------------------------------------------------
 -- Shared helpers

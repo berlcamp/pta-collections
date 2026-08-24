@@ -69,9 +69,9 @@ export async function proxy(request: NextRequest) {
   }
 
   // Signed in. Are they provisioned in `pta`?
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, global_role")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -83,13 +83,13 @@ export async function proxy(request: NextRequest) {
     // trigger on auth.users structurally cannot handle.
     await supabase.rpc("claim_invite");
 
-    const { data: claimed } = await supabase
+    ({ data: profile } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, global_role")
       .eq("auth_user_id", user.id)
-      .maybeSingle();
+      .maybeSingle());
 
-    if (!claimed) {
+    if (!profile) {
       if (pathname === "/no-access") return response;
       const url = request.nextUrl.clone();
       url.pathname = "/no-access";
@@ -98,11 +98,42 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (pathname === "/login" || pathname === "/no-access" || pathname === "/") {
+  const toDashboard = () => {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
+  };
+
+  // Holding a profile is not the same as having a way in.
+  //
+  // /dashboard needs an ACTIVE school and sends a member-less non-super-admin
+  // to /no-access. If this file bounced everyone holding a profile straight
+  // back to /dashboard, those two rules would chase each other forever and the
+  // browser would give up with ERR_TOO_MANY_REDIRECTS. So someone only leaves
+  // /no-access when they actually have somewhere to go, decided by the same
+  // predicate getSessionContext() uses: super admin, or an active membership
+  // in an active school. Deactivate a cashier, or deactivate their school, and
+  // they land here with an explanation instead of a broken tab.
+  //
+  // The membership query runs on /no-access only, so the normal request path
+  // still costs exactly one profile lookup.
+  if (pathname === "/no-access") {
+    if (profile.global_role === "super_admin") return toDashboard();
+
+    const { data: usable } = await supabase
+      .from("school_users")
+      .select("school_id, school:schools!inner(active)")
+      .eq("profile_id", profile.id)
+      .eq("status", "active")
+      .eq("school.active", true)
+      .limit(1);
+
+    return usable && usable.length > 0 ? toDashboard() : response;
+  }
+
+  if (pathname === "/login" || pathname === "/") {
+    return toDashboard();
   }
 
   return response;
