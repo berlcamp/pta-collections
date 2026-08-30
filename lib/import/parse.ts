@@ -14,6 +14,14 @@ export const KNOWN_COLUMNS = [
   "lrn", "student_number", "first_name", "middle_name", "last_name", "suffix",
   "birth_date", "sex", "grade_level", "section",
   "guardian1_name", "guardian1_contact", "guardian1_relationship",
+] as const;
+
+/**
+ * Columns an older template carried. They are read only to warn that they are
+ * being dropped: a student takes ONE guardian, and a second one silently
+ * imported is worse than one visibly refused.
+ */
+export const IGNORED_COLUMNS = [
   "guardian2_name", "guardian2_contact", "guardian2_relationship",
 ] as const;
 
@@ -26,6 +34,8 @@ export interface ParsedRow {
   raw: Record<string, string>;
   normalized: NormalizedImportRow | null;
   errors: string[];
+  /** Non-fatal: the row still imports, but something in it was dropped. */
+  warnings: string[];
 }
 
 /** Canonicalize a header: lowercase, underscores, no stray punctuation. */
@@ -134,24 +144,36 @@ export function parseRow(
   const sex = sexRaw ? normalizeSex(sexRaw) : null;
   if (sexRaw && !sex) errors.push(`Unrecognised sex: "${sexRaw}"`);
 
+  // One guardian per student — the contact the school actually calls. A file
+  // carrying a second one imports fine; the second is dropped, with a warning,
+  // rather than quietly becoming a record nothing in the app can reach.
+  const warnings: string[] = [];
   const guardians: NormalizedImportRow["guardians"] = [];
-  for (const [i, prefix] of ["guardian1", "guardian2"].entries()) {
-    const name = get(`${prefix}_name`);
-    if (!name) continue;
+  const guardianName = get("guardian1_name");
+  if (guardianName) {
     guardians.push({
-      name: titleCaseName(name),
-      contact: normalizeContact(get(`${prefix}_contact`)),
-      relationship: normalizeRelationship(get(`${prefix}_relationship`)),
-      is_primary: i === 0,
+      name: titleCaseName(guardianName),
+      contact: normalizeContact(get("guardian1_contact")),
+      relationship: normalizeRelationship(get("guardian1_relationship")),
+      is_primary: true,
     });
   }
+  const secondName = get("guardian2_name");
+  if (secondName) {
+    warnings.push(
+      `Only one guardian per student: "${titleCaseName(secondName)}" was not imported.`,
+    );
+  }
 
-  if (errors.length > 0) return { rowNumber, raw, normalized: null, errors };
+  if (errors.length > 0) {
+    return { rowNumber, raw, normalized: null, errors, warnings };
+  }
 
   return {
     rowNumber,
     raw,
     errors: [],
+    warnings,
     normalized: {
       lrn: lrnRaw || null,
       student_number: get("student_number") || null,
@@ -189,18 +211,22 @@ export function markInFileDuplicates(rows: ParsedRow[]): Set<number> {
   return dupes;
 }
 
-/** The distinct (grade, section) pairs a file references. */
+/** The distinct (grade, section) pairs a file references, with row counts. */
 export function collectSections(
   rows: ParsedRow[],
-): { grade_level: string; name: string }[] {
-  const set = new Map<string, { grade_level: string; name: string }>();
+): { grade_level: string; name: string; rows: number }[] {
+  const set = new Map<string, { grade_level: string; name: string; rows: number }>();
   for (const r of rows) {
     if (!r.normalized?.section) continue;
     const key = `${r.normalized.grade_level}||${r.normalized.section}`;
-    if (!set.has(key)) {
+    const seen = set.get(key);
+    if (seen) {
+      seen.rows += 1;
+    } else {
       set.set(key, {
         grade_level: r.normalized.grade_level,
         name: r.normalized.section,
+        rows: 1,
       });
     }
   }

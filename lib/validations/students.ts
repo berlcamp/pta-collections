@@ -1,13 +1,20 @@
 import { z } from "zod";
 
 /**
- * A guardian block the user opened and then left entirely empty is dropped on
- * submit, not rejected — the alternative is a form that refuses to save because
- * of a row the user never meant to fill in. A HALF-filled block is a different
- * thing: it is a typo, and it is reported on the exact field that is missing.
+ * A student carries exactly ONE parent/guardian — the collection contact the
+ * school actually calls. That guardian is either a link to a record already in
+ * this school (`guardian_id`, which is how siblings share one parent) or a new
+ * one typed in full.
+ *
+ * A block left entirely empty is dropped on submit, not rejected — the
+ * alternative is a form that refuses to save because of fields the user never
+ * meant to fill in. A HALF-filled block is a different thing: it is a typo, and
+ * it is reported on the exact field that is missing.
  */
 const guardianSchema = z
   .object({
+    /** Set when an existing guardian was picked; the typed fields then mirror it. */
+    guardian_id: z.uuid().nullish(),
     first_name: z.string().trim(),
     last_name: z.string().trim(),
     contact_number: z.string().trim().max(40).optional(),
@@ -21,9 +28,11 @@ const guardianSchema = z
       "Guardian",
       "Other",
     ]),
-    is_primary: z.boolean(),
   })
   .superRefine((g, ctx) => {
+    // A linked guardian carries its own details; nothing here is being typed.
+    if (g.guardian_id) return;
+
     const touched = [g.first_name, g.last_name, g.contact_number, g.email].some(
       (v) => v && v.length > 0,
     );
@@ -62,7 +71,8 @@ export const newStudentSchema = z.object({
   grade_level: z.string().min(1, "Choose a grade level."),
   section_id: z.uuid().optional().nullable(),
   student_number: z.string().trim().max(40).optional(),
-  guardians: z.array(guardianSchema).max(4),
+  guardian: guardianSchema,
 });
 
 export type NewStudentInput = z.infer<typeof newStudentSchema>;
+export type NewStudentGuardianInput = NewStudentInput["guardian"];

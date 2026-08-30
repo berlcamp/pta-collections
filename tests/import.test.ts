@@ -111,14 +111,27 @@ describe("row parsing", () => {
     expect(row.normalized!.lrn).toBeNull();
   });
 
-  it("marks the first guardian primary and the second not", () => {
+  it("keeps one guardian and warns about a second", () => {
     const row = parseRow(
       { ...good, guardian2_name: "Jose Cruz", guardian2_relationship: "tatay" },
       2,
       GRADES,
     );
-    expect(row.normalized!.guardians.map((g) => g.is_primary)).toEqual([true, false]);
-    expect(row.normalized!.guardians[1].relationship).toBe("Father");
+    expect(row.normalized!.guardians).toHaveLength(1);
+    expect(row.normalized!.guardians[0].name).toBe("Maria Dela Cruz");
+    expect(row.normalized!.guardians[0].is_primary).toBe(true);
+    expect(row.errors).toEqual([]);
+    expect(row.warnings[0]).toMatch(/Jose Cruz/);
+  });
+
+  it("carries no guardian, and no warning, when the columns are empty", () => {
+    const row = parseRow(
+      { ...good, guardian1_name: "", guardian1_contact: "" },
+      2,
+      GRADES,
+    );
+    expect(row.normalized!.guardians).toEqual([]);
+    expect(row.warnings).toEqual([]);
   });
 });
 
@@ -149,8 +162,8 @@ describe("section collection", () => {
       parseRow({ first_name: "C", last_name: "Z", grade_level: "8", section: "Rizal" }, 4, GRADES),
     ];
     expect(collectSections(rows)).toEqual([
-      { grade_level: "Grade 7", name: "Section A" },
-      { grade_level: "Grade 8", name: "Rizal" },
+      { grade_level: "Grade 7", name: "Section A", rows: 2 },
+      { grade_level: "Grade 8", name: "Rizal", rows: 1 },
     ]);
   });
 });

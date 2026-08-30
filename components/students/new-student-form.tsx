@@ -1,12 +1,13 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus, Trash2, UserRound } from "lucide-react";
+import { Loader2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,7 +37,9 @@ import {
 } from "@/components/ui/select";
 import { newStudentSchema, type NewStudentInput } from "@/lib/validations/students";
 import { createStudent } from "@/app/actions/students";
+import { GuardianPicker } from "@/components/students/guardian-picker";
 import { RELATIONSHIPS } from "@/lib/import/parse";
+import type { GuardianSearchResult } from "@/lib/data/guardians";
 import type { GradeLevel, Section } from "@/types/database.types";
 
 const NONE = "__none__";
@@ -52,6 +55,8 @@ export function NewStudentForm({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Set when the guardian is an existing record rather than one being typed.
+  const [linked, setLinked] = useState<GuardianSearchResult | null>(null);
 
   const form = useForm<NewStudentInput>({
     resolver: zodResolver(newStudentSchema),
@@ -67,34 +72,46 @@ export function NewStudentForm({
       grade_level: gradeLevels[0]?.code ?? "Grade 7",
       section_id: null,
       student_number: "",
-      guardians: [
-        {
-          first_name: "",
-          last_name: "",
-          contact_number: "",
-          email: "",
-          relationship: "Mother",
-          is_primary: true,
-        },
-      ],
+      guardian: {
+        guardian_id: null,
+        first_name: "",
+        last_name: "",
+        contact_number: "",
+        email: "",
+        relationship: "Mother",
+      },
     },
   });
 
-  const guardians = useFieldArray({ control: form.control, name: "guardians" });
+  function linkGuardian(g: GuardianSearchResult) {
+    setLinked(g);
+    form.setValue("guardian.guardian_id", g.id);
+    form.setValue("guardian.first_name", g.first_name);
+    form.setValue("guardian.last_name", g.last_name);
+    form.setValue("guardian.contact_number", g.contact_number ?? "");
+    form.setValue("guardian.email", g.email ?? "");
+    form.clearErrors("guardian");
+  }
+
+  function unlinkGuardian() {
+    setLinked(null);
+    form.setValue("guardian.guardian_id", null);
+    form.setValue("guardian.first_name", "");
+    form.setValue("guardian.last_name", "");
+    form.setValue("guardian.contact_number", "");
+    form.setValue("guardian.email", "");
+  }
 
   const gradeLevel = form.watch("grade_level");
   const sectionsForGrade = sections.filter((s) => s.grade_level === gradeLevel);
 
   function onSubmit(values: NewStudentInput) {
     startTransition(async () => {
+      // A guardian left entirely blank is not an error — it is a student
+      // enrolled before the office has the parent's details. The action drops it.
       const res = await createStudent({
         ...values,
         birth_date: values.birth_date || undefined,
-        // A guardian block left entirely blank is not an error — it is a row
-        // the user added and then changed their mind about.
-        guardians: values.guardians.filter(
-          (g) => g.first_name.trim() && g.last_name.trim(),
-        ),
       });
 
       if (!res.ok) {
@@ -355,65 +372,59 @@ export function NewStudentForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Parents / Guardians</CardTitle>
+            <CardTitle>Parent / Guardian</CardTitle>
             <CardDescription>
-              The first guardian is the primary contact for collection notices.
+              One guardian per student — the contact for collection notices. If
+              a sibling is already enrolled, link that same guardian rather than
+              typing them in again.
             </CardDescription>
-            {guardians.fields.length < 4 && (
-              <CardAction>
+            <CardAction>
+              <GuardianPicker onSelect={linkGuardian} disabled={pending} />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            {linked ? (
+              <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/30 p-4 sm:col-span-2">
+                <div className="min-w-0 space-y-1">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                    <UserRound className="size-4 text-muted-foreground" />
+                    {linked.first_name} {linked.last_name}
+                    <Badge variant="secondary">On file</Badge>
+                  </p>
+                  {linked.contact_number && (
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {linked.contact_number}
+                    </p>
+                  )}
+                  {linked.email && (
+                    <p className="text-xs break-all text-muted-foreground">
+                      {linked.email}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {linked.student_count === 0
+                      ? "Not linked to any student yet."
+                      : `Already the guardian of ${linked.student_count} other ${
+                          linked.student_count === 1 ? "student" : "students"
+                        }.`}
+                  </p>
+                </div>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={() =>
-                    guardians.append({
-                      first_name: "",
-                      last_name: "",
-                      contact_number: "",
-                      email: "",
-                      relationship: "Father",
-                      is_primary: false,
-                    })
-                  }
+                  onClick={unlinkGuardian}
+                  disabled={pending}
                 >
-                  <Plus className="size-4" />
-                  Add guardian
+                  <X className="size-3.5" />
+                  Unlink
                 </Button>
-              </CardAction>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {guardians.fields.map((row, i) => (
-              <div
-                key={row.id}
-                className="grid gap-4 rounded-lg border bg-muted/30 p-4 sm:grid-cols-2"
-              >
-                <div className="flex items-center justify-between sm:col-span-2">
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    <UserRound className="size-4 text-muted-foreground" />
-                    Guardian {i + 1}
-                    {i === 0 && (
-                      <span className="text-xs font-normal text-muted-foreground">
-                        (primary contact)
-                      </span>
-                    )}
-                  </p>
-                  {guardians.fields.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Remove guardian ${i + 1}`}
-                      onClick={() => guardians.remove(i)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  )}
-                </div>
-
+              </div>
+            ) : (
+              <>
                 <FormField
                   control={form.control}
-                  name={`guardians.${i}.first_name`}
+                  name="guardian.first_name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>First name</FormLabel>
@@ -427,7 +438,7 @@ export function NewStudentForm({
 
                 <FormField
                   control={form.control}
-                  name={`guardians.${i}.last_name`}
+                  name="guardian.last_name"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Last name</FormLabel>
@@ -441,7 +452,7 @@ export function NewStudentForm({
 
                 <FormField
                   control={form.control}
-                  name={`guardians.${i}.contact_number`}
+                  name="guardian.contact_number"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Contact number</FormLabel>
@@ -458,33 +469,36 @@ export function NewStudentForm({
                     </FormItem>
                   )}
                 />
+              </>
+            )}
 
-                <FormField
-                  control={form.control}
-                  name={`guardians.${i}.relationship`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Relationship</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {RELATIONSHIPS.map((r) => (
-                            <SelectItem key={r} value={r}>
-                              {r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            ))}
+            <FormField
+              control={form.control}
+              name="guardian.relationship"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Relationship</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {RELATIONSHIPS.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    How this guardian is related to the student.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
 

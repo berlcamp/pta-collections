@@ -27,21 +27,42 @@ import {
 import { TableScroller } from "@/components/common/data-table";
 import { StatCard } from "@/components/common/stat-card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   KNOWN_COLUMNS,
+  collectSections,
   markInFileDuplicates,
   normalizeHeader,
   parseRow,
   validateHeaders,
   type ParsedRow,
 } from "@/lib/import/parse";
+import {
+  sectionKey,
+  sectionMapFrom,
+  type SectionResolution,
+} from "@/lib/import/sections";
 import { toCsv } from "@/lib/utils/csv";
-import { commitImport, stageImport, type StageResult } from "@/app/actions/import";
+import {
+  commitImport,
+  resolveImportSections,
+  stageImport,
+  type StageResult,
+} from "@/app/actions/import";
 
-type Step = "upload" | "review" | "done";
+type Step = "upload" | "sections" | "review" | "done";
 
-const TEMPLATE = `lrn,student_number,first_name,middle_name,last_name,suffix,birth_date,sex,grade_level,section,guardian1_name,guardian1_contact,guardian1_relationship,guardian2_name,guardian2_contact,guardian2_relationship
-123456789012,2026-001,Juan,Dela,Cruz,,2012-05-14,M,Grade 7,Section A,Maria Dela Cruz,09171234567,Mother,Jose Dela Cruz,09181234567,Father
-123456789013,2026-002,Pedro,Santos,Reyes,,2012-08-02,M,Grade 7,Section A,Ana Reyes,09191234567,Mother,,,`;
+/** The picker value meaning "do not map this onto anything — create it". */
+const CREATE_NEW = "__new__";
+
+const TEMPLATE = `lrn,student_number,first_name,middle_name,last_name,suffix,birth_date,sex,grade_level,section,guardian1_name,guardian1_contact,guardian1_relationship
+123456789012,2026-001,Juan,Dela,Cruz,,2012-05-14,M,Grade 7,Section A,Maria Dela Cruz,09171234567,Mother
+123456789013,2026-002,Pedro,Santos,Reyes,,2012-08-02,M,Grade 7,Section A,Ana Reyes,09191234567,Mother`;
 
 export function CsvImportWizard({
   schoolYearId,
@@ -61,6 +82,9 @@ export function CsvImportWizard({
   const [dupes, setDupes] = useState<number[]>([]);
   const [headerErrors, setHeaderErrors] = useState<string[]>([]);
   const [stage, setStage] = useState<StageResult | null>(null);
+  const [resolutions, setResolutions] = useState<SectionResolution[]>([]);
+  /** Per section key: the existing section to import into, or null to create it. */
+  const [choices, setChoices] = useState<Record<string, string | null>>({});
   const [confirmSections, setConfirmSections] = useState(false);
   const [updateEnrollment, setUpdateEnrollment] = useState(false);
   const [summary, setSummary] = useState<{
@@ -92,23 +116,57 @@ export function CsvImportWizard({
         setDupes([...dupeSet]);
 
         startTransition(async () => {
-          const res = await stageImport({
-            filename: file.name,
+          // Sections are settled before anything is staged: a name that only
+          // differs in case or spacing is mapped silently, anything merely
+          // CLOSE to an existing section is put to the user.
+          const res = await resolveImportSections({
             schoolYearId,
-            rows: parsed,
-            inFileDuplicates: [...dupeSet],
+            sections: collectSections(parsed),
           });
           if (!res.ok) {
             toast.error(res.error);
             return;
           }
-          setStage(res.data);
-          setConfirmSections(res.data.newSections.length === 0);
-          setStep("review");
+
+          const initial: Record<string, string | null> = {};
+          for (const r of res.data) {
+            initial[sectionKey(r.grade_level, r.csv_name)] = r.resolved;
+          }
+          setResolutions(res.data);
+          setChoices(initial);
+
+          if (res.data.some((r) => r.kind === "suggested" || r.kind === "new")) {
+            setStep("sections");
+            return;
+          }
+          await stageRows(parsed, [...dupeSet], res.data, initial, file.name);
         });
       },
       error: (err) => toast.error(`Could not read the file: ${err.message}`),
     });
+  }
+
+  async function stageRows(
+    parsed: ParsedRow[],
+    inFileDuplicates: number[],
+    resolved: SectionResolution[],
+    picked: Record<string, string | null>,
+    name: string,
+  ) {
+    const res = await stageImport({
+      filename: name,
+      schoolYearId,
+      rows: parsed,
+      inFileDuplicates,
+      sectionMap: sectionMapFrom(resolved, picked),
+    });
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setStage(res.data);
+    setConfirmSections(res.data.newSections.length === 0);
+    setStep("review");
   }
 
   function downloadErrors() {
@@ -233,8 +291,19 @@ export function CsvImportWizard({
             <p>
               <strong className="text-foreground">Optional:</strong> lrn,
               student_number, middle_name, suffix, birth_date, sex, section,
-              guardian1_name, guardian1_contact, guardian1_relationship,
-              guardian2_name, guardian2_contact, guardian2_relationship.
+              guardian1_name, guardian1_contact, guardian1_relationship.
+            </p>
+            <p>
+              A student takes <strong className="text-foreground">one</strong>{" "}
+              guardian. <code>guardian2_*</code> columns from an older template
+              are ignored, and every row that has one is listed before you
+              import. Siblings sharing a guardian are linked to the same record,
+              not given a copy each.
+            </p>
+            <p>
+              Section names are matched against the sections defined for this
+              school year. A difference in case or spacing is resolved for you;
+              anything close but not equal is put to you before it is created.
             </p>
             <p>
               Grade values like <code>G7</code>, <code>Grade 7</code> and{" "}
@@ -244,6 +313,147 @@ export function CsvImportWizard({
             </p>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // ---- Step: sections -----------------------------------------------------
+  if (step === "sections") {
+    const undecided = resolutions.filter(
+      (r) => r.kind === "suggested" || r.kind === "new",
+    );
+    const autoMapped = resolutions.filter((r) => r.kind === "normalized");
+
+    return (
+      <div className="max-w-4xl space-y-4">
+        <Card className="border-amber-500/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              Match {undecided.length} section
+              {undecided.length === 1 ? "" : "s"} to this school year
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              These names in the file are not sections of {schoolYearName}. Point
+              each one at the section it means, or create it. Creating a
+              misspelling is what puts &ldquo;Sampaguita&rdquo; and
+              &ldquo;Sampagita&rdquo; side by side and splits every by-section
+              report in two.
+            </p>
+
+            <TableScroller>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>In the file</TableHead>
+                    <TableHead>Grade</TableHead>
+                    <TableHead className="text-right">Students</TableHead>
+                    <TableHead>Import into</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {undecided.map((r) => {
+                    const key = sectionKey(r.grade_level, r.csv_name);
+                    const choice = choices[key] ?? CREATE_NEW;
+                    return (
+                      <TableRow key={key}>
+                        <TableCell className="font-medium">
+                          {r.csv_name}
+                          {r.kind === "suggested" && (
+                            <Badge variant="outline" className="ml-2 border-amber-500/30 text-amber-700 dark:text-amber-400">
+                              Close match
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">{r.grade_level}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {r.rows}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={choice}
+                            onValueChange={(v) =>
+                              setChoices((prev) => ({
+                                ...prev,
+                                [key]: v === CREATE_NEW ? null : v,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-full min-w-0 sm:w-72">
+                              <SelectValue>
+                                {choice === CREATE_NEW
+                                  ? `Create “${r.csv_name}”`
+                                  : choice}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={CREATE_NEW}>
+                                Create “{r.csv_name}”
+                              </SelectItem>
+                              {r.candidates.map((c) => (
+                                <SelectItem key={c.name} value={c.name}>
+                                  {c.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableScroller>
+          </CardContent>
+        </Card>
+
+        {autoMapped.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">
+                {autoMapped.length} section
+                {autoMapped.length === 1 ? " was" : "s were"} matched
+                automatically
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-sm text-muted-foreground">
+              <p>
+                Only the case, spacing or a &ldquo;Section&rdquo; prefix
+                differed, so there was nothing to decide.
+              </p>
+              <ul className="space-y-0.5">
+                {autoMapped.map((r) => (
+                  <li key={sectionKey(r.grade_level, r.csv_name)}>
+                    <span className="font-mono text-xs">{r.grade_level}</span>{" "}
+                    “{r.csv_name}” → <strong className="text-foreground">{r.resolved}</strong>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setStep("upload")}
+            disabled={pending}
+          >
+            Start over
+          </Button>
+          <Button
+            onClick={() =>
+              startTransition(async () => {
+                await stageRows(rows, dupes, resolutions, choices, filename);
+              })
+            }
+            disabled={pending}
+          >
+            {pending && <Loader2 className="size-4 animate-spin" />}
+            Continue
+          </Button>
+        </div>
       </div>
     );
   }
@@ -279,6 +489,8 @@ export function CsvImportWizard({
               setStage(null);
               setSummary(null);
               setFilename("");
+              setResolutions([]);
+              setChoices({});
             }}
           >
             Import another file
@@ -299,6 +511,21 @@ export function CsvImportWizard({
 
   const preview = rows.slice(0, 50);
   const errorRows = rows.filter((r) => r.errors.length > 0);
+  const warningRows = rows.filter((r) => r.warnings.length > 0);
+  /** The section a row will actually be enrolled into, after mapping. */
+  const finalSection = (grade: string, name: string) => {
+    const key = sectionKey(grade, name);
+    const resolution = resolutions.find(
+      (r) => sectionKey(r.grade_level, r.csv_name) === key,
+    );
+    if (!resolution) return name;
+    return (key in choices ? choices[key] : resolution.resolved) ?? name;
+  };
+
+  // Every file spelling that ends up under a different, existing section name.
+  const renamed = resolutions.filter(
+    (r) => finalSection(r.grade_level, r.csv_name) !== r.csv_name,
+  );
 
   return (
     <div className="space-y-4">
@@ -340,6 +567,69 @@ export function CsvImportWizard({
                 </span>
               </span>
             </label>
+          </CardContent>
+        </Card>
+      )}
+
+      {renamed.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              {renamed.length} section name
+              {renamed.length === 1 ? "" : "s"} matched to an existing section
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              These students join the section already on file. Nothing new is
+              created for them.
+            </p>
+            <ul className="space-y-0.5">
+              {renamed.map((r) => {
+                const key = sectionKey(r.grade_level, r.csv_name);
+                const finalName = finalSection(r.grade_level, r.csv_name);
+                return (
+                  <li key={key}>
+                    <span className="font-mono text-xs">{r.grade_level}</span>{" "}
+                    “{r.csv_name}” →{" "}
+                    <strong className="text-foreground">{finalName}</strong>{" "}
+                    <span className="text-xs">
+                      ({r.rows} student{r.rows === 1 ? "" : "s"})
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {warningRows.length > 0 && (
+        <Card className="border-amber-500/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              {warningRows.length} row{warningRows.length === 1 ? "" : "s"} with
+              a second guardian
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-2 text-sm text-muted-foreground">
+              A student takes one guardian. These rows still import — only the
+              first guardian is kept.
+            </p>
+            <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
+              {warningRows.slice(0, 20).map((r) => (
+                <li key={r.rowNumber} className="text-muted-foreground">
+                  <span className="font-mono">Row {r.rowNumber}</span>:{" "}
+                  {r.warnings.join("; ")}
+                </li>
+              ))}
+              {warningRows.length > 20 && (
+                <li className="text-muted-foreground italic">
+                  …and {warningRows.length - 20} more.
+                </li>
+              )}
+            </ul>
           </CardContent>
         </Card>
       )}
@@ -423,7 +713,7 @@ export function CsvImportWizard({
                 <TableHead>LRN</TableHead>
                 <TableHead>Grade</TableHead>
                 <TableHead>Section</TableHead>
-                <TableHead>Guardians</TableHead>
+                <TableHead>Guardian</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -458,10 +748,24 @@ export function CsvImportWizard({
                       {r.normalized?.grade_level ?? r.raw.grade_level ?? "—"}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {r.normalized?.section ?? "—"}
+                      {r.normalized?.section ? (
+                        <>
+                          {finalSection(r.normalized.grade_level, r.normalized.section)}
+                          {finalSection(
+                            r.normalized.grade_level,
+                            r.normalized.section,
+                          ) !== r.normalized.section && (
+                            <span className="block text-xs text-muted-foreground">
+                              file: {r.normalized.section}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {r.normalized?.guardians.length ?? 0}
+                      {r.normalized?.guardians[0]?.name ?? "—"}
                     </TableCell>
                   </TableRow>
                 );

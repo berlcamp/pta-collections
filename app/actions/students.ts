@@ -6,7 +6,30 @@ import { requireSchool } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { newStudentSchema } from "@/lib/validations/students";
 import { normalizeContact } from "@/lib/utils/names";
+import { searchGuardians, type GuardianSearchResult } from "@/lib/data/guardians";
 import type { ActionResult } from "./types";
+
+/**
+ * Type-ahead for the "link an existing guardian" picker on /students/new.
+ *
+ * Siblings share one parent record rather than getting a copy each, so the
+ * form has to be able to find the parent that is already on file.
+ */
+export async function findGuardians(
+  query: string,
+): Promise<ActionResult<GuardianSearchResult[]>> {
+  const ctx = await requireSchool();
+  if (!can(ctx.activeRole, "manageStudents")) {
+    return { ok: false, error: "Only an administrator can look up guardians." };
+  }
+
+  const rows = await searchGuardians({
+    schoolId: ctx.activeSchool.id,
+    query,
+    limit: 8,
+  });
+  return { ok: true, data: rows };
+}
 
 /**
  * Manual student registration.
@@ -83,21 +106,40 @@ export async function createStudent(
     };
   }
 
-  for (const g of v.guardians) {
-    const contact = normalizeContact(g.contact_number ?? null);
+  // Exactly one guardian per student. Either it is a record that already
+  // exists in this school — the sibling case, linked by id — or it is typed in
+  // full and created here.
+  const g = v.guardian;
+  const contact = normalizeContact(g.contact_number ?? null);
+  const named = Boolean(g.first_name && g.last_name);
+  let guardianId: string | undefined;
 
-    // Reuse an existing guardian where one plainly matches — siblings share a
-    // parent, and duplicating them fragments contact details.
-    const { data: existing } = await supabase
+  if (g.guardian_id) {
+    // The id came from the browser, so it is confirmed to live in this school
+    // before anything is linked to it.
+    const { data: linked } = await supabase
+      .from("parents_guardians")
+      .select("id")
+      .eq("school_id", ctx.activeSchool.id)
+      .eq("id", g.guardian_id)
+      .maybeSingle();
+    guardianId = (linked as { id: string } | null)?.id;
+  } else if (named) {
+    // Reuse an exact match on name AND contact — the same parent typed out
+    // twice for two siblings instead of picked from the search. A name alone
+    // is not enough: two different Maria Santos are two different people.
+    let match = supabase
       .from("parents_guardians")
       .select("id")
       .eq("school_id", ctx.activeSchool.id)
       .ilike("first_name", g.first_name)
-      .ilike("last_name", g.last_name)
-      .limit(1)
-      .maybeSingle();
+      .ilike("last_name", g.last_name);
+    match = contact
+      ? match.eq("contact_number", contact)
+      : match.is("contact_number", null);
 
-    let guardianId = (existing as { id: string } | null)?.id;
+    const { data: existing } = await match.limit(1).maybeSingle();
+    guardianId = (existing as { id: string } | null)?.id;
 
     if (!guardianId) {
       const { data: created } = await supabase
@@ -114,16 +156,16 @@ export async function createStudent(
         .single();
       guardianId = (created as { id: string } | null)?.id;
     }
+  }
 
-    if (guardianId) {
-      await supabase.from("student_guardians").insert({
-        school_id: ctx.activeSchool.id,
-        student_id: student.id,
-        guardian_id: guardianId,
-        relationship: g.relationship,
-        is_primary: g.is_primary,
-      });
-    }
+  if (guardianId) {
+    await supabase.from("student_guardians").insert({
+      school_id: ctx.activeSchool.id,
+      student_id: student.id,
+      guardian_id: guardianId,
+      relationship: g.relationship,
+      is_primary: true,
+    });
   }
 
   revalidatePath("/students");

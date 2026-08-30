@@ -150,11 +150,13 @@ function FeeTypeDialog({
   });
 
   // One dialog serves "new" and every row's "edit", so it re-seeds whenever the
-  // row behind it changes.
-  const [lastId, setLastId] = useState(feeType?.id ?? null);
-  if ((feeType?.id ?? null) !== lastId) {
-    setLastId(feeType?.id ?? null);
-    form.reset(defaultsFor(feeType));
+  // row behind it changes — and on every open, or a cancelled draft (values and
+  // validation errors alike) would still be sitting there the next time.
+  const [seeded, setSeeded] = useState<string | null>(null);
+  const seed = open ? (feeType?.id ?? "new") : null;
+  if (seed !== seeded) {
+    setSeeded(seed);
+    if (open) form.reset(defaultsFor(feeType));
   }
 
   function onSubmit(values: FeeTypeValues) {
@@ -182,7 +184,7 @@ function FeeTypeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] overflow-y-auto">
+      <DialogContent className="flex max-h-[90svh] flex-col sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{feeType ? "Edit fee type" : "New fee type"}</DialogTitle>
           <DialogDescription>
@@ -195,104 +197,119 @@ function FeeTypeDialog({
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             noValidate
-            className="space-y-4"
+            className="flex min-h-0 flex-1 flex-col gap-4"
           >
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Name <RequiredMark />
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="PTA Annual Membership" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+            {/* Only the fields scroll: the footer stays reachable on a short
+                viewport, and its edge-to-edge bleed needs to sit outside the
+                scroll box. `-mx-1 px-1` gives focus rings room without widening
+                the column. */}
+            <div className="-mx-1 min-w-0 flex-1 space-y-4 overflow-y-auto px-1">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Name <RequiredMark />
+                    </FormLabel>
                     <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
+                      <Input placeholder="PTA Annual Membership" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
-                          {c.label}
-                          <span className="text-muted-foreground">
-                            {" "}
-                            — {c.hint}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="default_amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Default amount</FormLabel>
-                  <FormControl>
-                    <Input
-                      inputMode="decimal"
-                      placeholder="100.00"
-                      className="text-right font-mono tabular-nums"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Used when assessing this fee.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-full min-w-0">
+                          {/* Label only. The hint belongs in the list: a
+                              SelectItem wraps every child in its ItemText, so
+                              leaving it implicit would render the full sentence
+                              inside the trigger and force the dialog wider than
+                              it can draw. */}
+                          <SelectValue>
+                            {
+                              CATEGORIES.find((c) => c.value === field.value)
+                                ?.label
+                            }
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CATEGORIES.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>
+                            {c.label}
+                            <span className="text-muted-foreground">
+                              {" "}
+                              — {c.hint}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Description{" "}
-                    <span className="font-normal text-muted-foreground">
-                      (optional)
-                    </span>
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea rows={2} className="resize-none" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="is_recurring"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel>Recurring</FormLabel>
+              <FormField
+                control={form.control}
+                name="default_amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default amount</FormLabel>
+                    <FormControl>
+                      <Input
+                        inputMode="decimal"
+                        placeholder="100.00"
+                        className="text-right font-mono tabular-nums"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormDescription>
-                      Charged again each school year.
+                      Used when assessing this fee.
                     </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Description{" "}
+                      <span className="font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea rows={2} className="resize-none" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="is_recurring"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel>Recurring</FormLabel>
+                      <FormDescription>
+                        Charged again each school year.
+                      </FormDescription>
                   </div>
                   <FormControl>
                     <Switch
@@ -324,6 +341,8 @@ function FeeTypeDialog({
                 </FormItem>
               )}
             />
+
+            </div>
 
             <DialogFooter>
               <Button

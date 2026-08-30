@@ -313,6 +313,10 @@ export interface NormalizedImportRow {
   sex: "M" | "F" | null;
   grade_level: string;
   section: string | null;
+  /**
+   * At most ONE entry: a student takes a single guardian. Kept as an array
+   * because that is the shape pta.commit_import_batch already iterates.
+   */
   guardians: {
     name: string;
     contact: string | null;

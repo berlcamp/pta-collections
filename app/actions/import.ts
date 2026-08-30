@@ -5,7 +5,40 @@ import { createClient } from "@/lib/supabase/server";
 import { requireSchool } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import type { ParsedRow } from "@/lib/import/parse";
+import {
+  resolveFileSections,
+  sectionKey,
+  type SectionResolution,
+} from "@/lib/import/sections";
 import type { ActionResult } from "./types";
+
+/**
+ * Match the file's section names against the ones this school has defined,
+ * before anything is staged.
+ *
+ * A misspelling here is expensive and invisible: the old import compared names
+ * byte-for-byte and created whatever missed, so "Sampagita" became a second
+ * section next to "Sampaguita" and every by-section report split in two.
+ */
+export async function resolveImportSections(input: {
+  schoolYearId: string;
+  sections: { grade_level: string; name: string; rows: number }[];
+}): Promise<ActionResult<SectionResolution[]>> {
+  const ctx = await requireSchool();
+  if (!can(ctx.activeRole, "importStudents")) {
+    return { ok: false, error: "Only an administrator can import students." };
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("sections")
+    .select("grade_level, name")
+    .eq("school_id", ctx.activeSchool.id)
+    .eq("school_year_id", input.schoolYearId);
+
+  const existing = (data ?? []) as { grade_level: string; name: string }[];
+  return { ok: true, data: resolveFileSections(input.sections, existing) };
+}
 
 export interface StageResult {
   batchId: string;
@@ -29,6 +62,13 @@ export async function stageImport(input: {
   schoolYearId: string;
   rows: ParsedRow[];
   inFileDuplicates: number[];
+  /**
+   * "<grade>||<name as written in the file>" -> the section name to stage it
+   * as, from resolveImportSections plus whatever the user confirmed. Rows are
+   * stored under the canonical name, so the commit RPC's exact-name lookup
+   * finds the existing section instead of creating a near-duplicate.
+   */
+  sectionMap?: Record<string, string>;
 }): Promise<ActionResult<StageResult>> {
   const ctx = await requireSchool();
   if (!can(ctx.activeRole, "importStudents")) {
@@ -40,6 +80,15 @@ export async function stageImport(input: {
   if (input.rows.length > 5000) {
     return { ok: false, error: "Split files larger than 5,000 rows." };
   }
+
+  const sectionMap = input.sectionMap ?? {};
+  const rows = input.rows.map((r) => {
+    if (!r.normalized?.section) return r;
+    const canonical =
+      sectionMap[sectionKey(r.normalized.grade_level, r.normalized.section)];
+    if (!canonical || canonical === r.normalized.section) return r;
+    return { ...r, normalized: { ...r.normalized, section: canonical } };
+  });
 
   const supabase = await createClient();
 
@@ -61,8 +110,8 @@ export async function stageImport(input: {
   }
 
   // Match against existing students, by LRN first then student number.
-  const lrns = input.rows.map((r) => r.normalized?.lrn).filter(Boolean) as string[];
-  const numbers = input.rows
+  const lrns = rows.map((r) => r.normalized?.lrn).filter(Boolean) as string[];
+  const numbers = rows
     .map((r) => r.normalized?.student_number)
     .filter(Boolean) as string[];
 
@@ -94,7 +143,7 @@ export async function stageImport(input: {
 
   const dupSet = new Set(input.inFileDuplicates);
 
-  const rowsToInsert = input.rows.map((r) => {
+  const rowsToInsert = rows.map((r) => {
     let status: "valid" | "error" | "duplicate" | "matched" = "valid";
     let matchedStudentId: string | null = null;
 
@@ -159,7 +208,7 @@ export async function stageImport(input: {
   // Which sections in the file don't exist yet? The user confirms these before
   // commit — the one prompt that stops 'Grade 7'/'G7'/'7' fragmenting (D21).
   const referenced = new Map<string, { grade_level: string; name: string }>();
-  for (const r of input.rows) {
+  for (const r of rows) {
     if (!r.normalized?.section) continue;
     referenced.set(`${r.normalized.grade_level}||${r.normalized.section}`, {
       grade_level: r.normalized.grade_level,
