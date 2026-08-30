@@ -4,6 +4,7 @@ import {
   lookupPaymentFeeNames,
   paymentIdsForFeeType,
 } from "@/lib/data/hydrate";
+import { lookupDonationNames } from "@/lib/data/donations";
 
 export interface ReportFilters {
   schoolId: string;
@@ -256,4 +257,99 @@ export async function getAnnualReport(
     totalCollected: rows.reduce((s, r) => s + Number(r.total_paid), 0),
     totalOutstanding: rows.reduce((s, r) => s + Number(r.outstanding), 0),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Donations                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface DonationReportRow {
+  id: string;
+  acknowledgement_number: string;
+  collection_date: string;
+  donation_date: string;
+  donor_id: string | null;
+  donor_name: string;
+  is_anonymous: boolean;
+  program_name: string;
+  kind: "cash" | "in_kind";
+  amount: number;
+  payment_method: string | null;
+  item_description: string | null;
+  received_by_name: string;
+}
+
+/**
+ * Donation report.
+ *
+ * Reads v_donations_local for the same reason the collection report reads
+ * v_payments_local: collection_date is the school-local calendar day computed
+ * in SQL (D11). Filtering donation_date directly would slice the day at UTC
+ * midnight and split every morning's giving in two.
+ */
+export async function getDonationReport(
+  f: ReportFilters & { programId?: string | null; kind?: string | null },
+): Promise<DonationReportRow[]> {
+  const supabase = await createClient();
+
+  let q = supabase
+    .from("v_donations_local")
+    .select(
+      "id,acknowledgement_number,collection_date,donation_date,donor_id," +
+        "program_id,is_anonymous,kind,amount,payment_method,item_description,received_by",
+    )
+    .eq("school_id", f.schoolId)
+    .eq("school_year_id", f.schoolYearId)
+    .eq("status", "posted");
+
+  if (f.from) q = q.gte("collection_date", f.from);
+  if (f.to) q = q.lte("collection_date", f.to);
+  if (f.programId) q = q.eq("program_id", f.programId);
+  if (f.kind) q = q.eq("kind", f.kind);
+  if (f.paymentMethod) q = q.eq("payment_method", f.paymentMethod);
+
+  const { data } = await q
+    .order("donation_date", { ascending: false })
+    .limit(5000);
+
+  type Raw = {
+    id: string;
+    acknowledgement_number: string;
+    collection_date: string;
+    donation_date: string;
+    donor_id: string | null;
+    program_id: string;
+    is_anonymous: boolean;
+    kind: "cash" | "in_kind";
+    amount: number;
+    payment_method: string | null;
+    item_description: string | null;
+    received_by: string;
+  };
+
+  const rows = (data ?? []) as unknown as Raw[];
+
+  const names = await lookupDonationNames(
+    rows.map((r) => r.donor_id),
+    rows.map((r) => r.program_id),
+    rows.map((r) => r.received_by),
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    acknowledgement_number: r.acknowledgement_number,
+    collection_date: r.collection_date,
+    donation_date: r.donation_date,
+    donor_id: r.donor_id,
+    donor_name: r.is_anonymous
+      ? "Anonymous"
+      : (names.donors.get(r.donor_id ?? "")?.display_name ?? "—"),
+    is_anonymous: r.is_anonymous,
+    program_name: names.programs.get(r.program_id) ?? "—",
+    kind: r.kind,
+    amount: Number(r.amount),
+    payment_method: r.payment_method,
+    item_description: r.item_description,
+    received_by_name: names.profiles.get(r.received_by) ?? "—",
+  }));
 }

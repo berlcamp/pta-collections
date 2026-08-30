@@ -19,6 +19,8 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CollectionCharts } from "@/components/reports/collection-charts";
+import { ProgramProgressCard } from "@/components/donations/program-progress";
+import { getProgramTotals } from "@/lib/data/donations";
 import { SchoolYearPicker } from "@/components/common/school-year-picker";
 import { getSchoolYears } from "@/lib/data/school";
 
@@ -66,7 +68,8 @@ export default async function DashboardPage({
   const today = todayInTimezone(school.timezone);
   const monthStart = startOfMonthInTimezone(school.timezone);
 
-  const [enrollments, financials, daily, byFeeType] = await Promise.all([
+  const [enrollments, financials, daily, byFeeType, programTotals] =
+    await Promise.all([
     supabase
       .from("student_enrollments")
       .select("id", { count: "exact", head: true })
@@ -89,6 +92,7 @@ export default async function DashboardPage({
       .select("fee_type_name,total")
       .eq("school_id", school.id)
       .eq("school_year_id", schoolYear.id),
+    getProgramTotals(school.id, schoolYear.id),
   ]);
 
   type Fin = { total_charged: number; total_paid: number; outstanding: number };
@@ -203,6 +207,35 @@ export default async function DashboardPage({
         />
         <CollectionCharts daily={dailyRows} byFeeType={feeTypeTotals} />
       </div>
+
+      {/* Kept below the fee figures and visually separate: donation money is
+          not fee money, and a school that shows the two side by side in one
+          headline will eventually report a total it cannot bank. */}
+      {programTotals.length > 0 && (
+        <div className="mt-10">
+          <SectionHeader
+            title="Programs and activities"
+            description="Voluntary giving. Counted apart from fee collections."
+            actions={
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/donations">View donations</Link>
+              </Button>
+            }
+          />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {programTotals
+              .filter((t) => t.status !== "cancelled")
+              .slice(0, 6)
+              .map((t) => (
+                <ProgramProgressCard
+                  key={t.program_id}
+                  totals={t}
+                  href={`/donations/programs/${t.program_id}`}
+                />
+              ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -20,6 +20,15 @@ export const CAPABILITIES = {
   waiveCharge: ["admin"],
   recordPayment: ["admin", "cashier", "treasurer"],
   voidPayment: ["admin", "treasurer"],
+  // Donations mirror the payment split exactly: the three roles that can take
+  // money can take a donation, and only the two that can reverse a payment can
+  // reverse one. A program is configuration, so it is admin-only like fee types.
+  manageProgram: ["admin"],
+  recordDonation: ["admin", "cashier", "treasurer"],
+  voidDonation: ["admin", "treasurer"],
+  recordPledge: ["admin", "cashier", "treasurer"],
+  cancelPledge: ["admin", "treasurer"],
+  manageDonors: ["admin", "treasurer"],
   viewReports: ["admin", "treasurer", "viewer", "cashier"],
   exportReports: ["admin", "treasurer"],
   viewAuditLogs: ["admin", "treasurer"],

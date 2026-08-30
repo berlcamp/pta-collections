@@ -24,6 +24,10 @@ export type NavIconName =
   | "Receipt"
   | "Banknote"
   | "BadgePercent"
+  | "HeartHandshake"
+  | "HandCoins"
+  | "Target"
+  | "Gift"
   | "ListChecks"
   | "ClipboardList"
   | "FileText"
@@ -90,6 +94,26 @@ export const SCHOOL_NAV: NavGroup[] = [
         ],
       },
       {
+        // Donations are deliberately their OWN module rather than a tab under
+        // Collections: nothing here is an obligation, none of it settles a
+        // charge, and it is numbered in a separate receipt series. Filing it
+        // under Collections would invite exactly the confusion the schema
+        // works to prevent.
+        label: "Projects & Programs",
+        // Points at the Programs tab, following the same rule as Charges and
+        // Reports: a module's href is its FIRST child. What a PTA officer wants
+        // on landing here is how each fundraiser is tracking, not a
+        // reverse-chronological list of individual gifts.
+        href: "/donations/programs",
+        icon: "HeartHandshake",
+        children: [
+          { label: "Programs", href: "/donations/programs", icon: "Target" },
+          { label: "Donations received", href: "/donations", icon: "HandCoins" },
+          { label: "Pledges", href: "/donations/pledges", icon: "ListChecks" },
+          { label: "Donors", href: "/donations/donors", icon: "Users" },
+        ],
+      },
+      {
         label: "Reports",
         href: "/reports/collections",
         icon: "FileBarChart",
@@ -97,6 +121,7 @@ export const SCHOOL_NAV: NavGroup[] = [
           { label: "Collections", href: "/reports/collections", icon: "FileBarChart" },
           { label: "Fee types", href: "/reports/fee-types", icon: "FileSpreadsheet" },
           { label: "Cashiers", href: "/reports/cashiers", icon: "Users" },
+          { label: "Donations", href: "/reports/donations", icon: "Gift" },
           { label: "Annual PTA report", href: "/reports/annual", icon: "ScrollText" },
         ],
       },

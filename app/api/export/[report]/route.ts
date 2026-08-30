@@ -7,8 +7,14 @@ import {
   getAnnualReport,
   getCashierReport,
   getCollectionReport,
+  getDonationReport,
   getFeeTypeReport,
 } from "@/lib/reports/queries";
+import {
+  getDonorTotals,
+  getPledges,
+  getProgramTotals,
+} from "@/lib/data/donations";
 import { formatMoneyForExport } from "@/lib/financial/money";
 import { csvResponse, toCsv } from "@/lib/utils/csv";
 
@@ -170,6 +176,108 @@ export async function GET(
       return csvResponse(
         `annual-pta-report-${stamp}.csv`,
         toCsv(["Item", "Amount"], rows),
+      );
+    }
+
+    case "donations": {
+      const rows = await getDonationReport({
+        ...filters,
+        kind: sp.get("kind"),
+      });
+      return csvResponse(
+        `donations-${stamp}.csv`,
+        toCsv(
+          [
+            "Date", "Acknowledgement", "Donor", "Program", "Kind",
+            "Item", "Method", "Amount", "Received by",
+          ],
+          rows.map((r) => [
+            r.collection_date,
+            r.acknowledgement_number,
+            r.donor_name,
+            r.program_name,
+            r.kind === "cash" ? "Cash" : "In kind",
+            r.item_description,
+            r.payment_method,
+            formatMoneyForExport(r.amount),
+            r.received_by_name,
+          ]),
+        ),
+      );
+    }
+
+    case "donation-programs": {
+      const rows = await getProgramTotals(ctx.activeSchool.id, schoolYear.id);
+      return csvResponse(
+        `donation-programs-${stamp}.csv`,
+        toCsv(
+          [
+            "Program", "Category", "Status", "Target", "Cash received",
+            "In-kind value", "Total received", "Progress %", "Donors",
+            "Gifts", "Pledged", "Pledge outstanding",
+          ],
+          rows.map((r) => [
+            r.name,
+            r.category,
+            r.status,
+            r.target_amount === null ? "" : formatMoneyForExport(r.target_amount),
+            formatMoneyForExport(r.cash_received),
+            formatMoneyForExport(r.in_kind_value),
+            formatMoneyForExport(r.total_received),
+            r.progress_pct === null ? "" : r.progress_pct,
+            r.donor_count,
+            r.donation_count,
+            formatMoneyForExport(r.pledged_total),
+            formatMoneyForExport(r.pledge_outstanding),
+          ]),
+        ),
+      );
+    }
+
+    case "pledges": {
+      const rows = await getPledges(ctx.activeSchool.id, schoolYear.id);
+      return csvResponse(
+        `pledges-${stamp}.csv`,
+        toCsv(
+          [
+            "Donor", "Contact", "Program", "Pledged", "Received",
+            "Still due", "Due date", "Status",
+          ],
+          rows.map((r) => [
+            r.donor_name,
+            r.donor_contact,
+            r.program_name,
+            formatMoneyForExport(r.pledged_amount),
+            formatMoneyForExport(r.fulfilled_amount),
+            formatMoneyForExport(r.remaining_amount),
+            r.due_date,
+            r.fulfilment_status,
+          ]),
+        ),
+      );
+    }
+
+    case "donors": {
+      const rows = await getDonorTotals(ctx.activeSchool.id, schoolYear.id, 5000);
+      return csvResponse(
+        `donors-${stamp}.csv`,
+        toCsv(
+          [
+            "Donor", "Type", "Contact", "Cash given", "In-kind given",
+            "Total given", "Gifts", "Programs", "Last gift",
+          ],
+          rows.map((r) => [
+            r.display_name,
+            r.donor_type,
+            r.contact_number,
+            formatMoneyForExport(r.cash_given),
+            formatMoneyForExport(r.in_kind_given),
+            formatMoneyForExport(r.total_given),
+            r.donation_count,
+            r.program_count,
+            r.last_donation_at,
+          ]),
+        ),
       );
     }
 

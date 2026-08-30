@@ -38,6 +38,37 @@ export type ImportBatchStatus =
   | "cancelled";
 export type ImportRowStatus = "valid" | "error" | "duplicate" | "matched";
 
+/* -------------------------------------------------------------------------- */
+/*  Donations — PTA programs and voluntary giving (migration 0014)            */
+/* -------------------------------------------------------------------------- */
+
+export type ProgramCategory =
+  | "program"
+  | "activity"
+  | "project"
+  | "fund"
+  | "other";
+export type ProgramStatus = "planned" | "open" | "closed" | "cancelled";
+export type DonorType =
+  | "guardian"
+  | "alumnus"
+  | "staff"
+  | "business"
+  | "government"
+  | "organization"
+  | "other";
+/** Cash is money in the drawer; in-kind is goods or services at an estimated
+ *  value. They are never added together in a cash total. */
+export type DonationKind = "cash" | "in_kind";
+export type DonationStatus = "posted" | "voided";
+/** Human-set only, exactly like ChargeStatus. Fulfilment is derived. */
+export type PledgeStatus = "open" | "cancelled";
+export type PledgeFulfilment =
+  | "open"
+  | "partially_fulfilled"
+  | "fulfilled"
+  | "cancelled";
+
 export interface Profile {
   id: string;
   auth_user_id: string | null;
@@ -323,6 +354,154 @@ export interface NormalizedImportRow {
     relationship: string;
     is_primary: boolean;
   }[];
+}
+
+export interface DonationProgram {
+  id: string;
+  school_id: string;
+  school_year_id: string;
+  name: string;
+  description: string | null;
+  category: ProgramCategory;
+  target_amount: number | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  status: ProgramStatus;
+  status_reason: string | null;
+  accepts_pledges: boolean;
+  accepts_in_kind: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** pta.v_donation_program_totals — the progress figures behind every program. */
+export interface ProgramTotals {
+  program_id: string;
+  school_id: string;
+  school_year_id: string;
+  name: string;
+  description: string | null;
+  category: ProgramCategory;
+  status: ProgramStatus;
+  target_amount: number | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  accepts_pledges: boolean;
+  accepts_in_kind: boolean;
+  created_at: string;
+  cash_received: number;
+  in_kind_value: number;
+  total_received: number;
+  donation_count: number;
+  donor_count: number;
+  pledged_total: number;
+  pledge_outstanding: number;
+  /** Null when the program has no target; capped at 100. */
+  progress_pct: number | null;
+}
+
+export interface Donor {
+  id: string;
+  school_id: string;
+  donor_type: DonorType;
+  display_name: string;
+  guardian_id: string | null;
+  student_id: string | null;
+  contact_number: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Donation {
+  id: string;
+  school_id: string;
+  school_year_id: string;
+  program_id: string;
+  /** Null for an anonymous donation — and only then. */
+  donor_id: string | null;
+  pledge_id: string | null;
+  acknowledgement_number: string;
+  donation_date: string;
+  kind: DonationKind;
+  /** For in-kind, the estimated peso value rather than money received. */
+  amount: number;
+  payment_method: PaymentMethod | null;
+  reference_number: string | null;
+  item_description: string | null;
+  is_anonymous: boolean;
+  remarks: string | null;
+  received_by: string;
+  status: DonationStatus;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
+  acting_as_super_admin: boolean;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DonationPledge {
+  id: string;
+  school_id: string;
+  school_year_id: string;
+  program_id: string;
+  donor_id: string;
+  pledged_amount: number;
+  due_date: string | null;
+  status: PledgeStatus;
+  status_reason: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** pta.v_donation_pledge_status — fulfilment derived from posted donations. */
+export interface PledgeStatusRow {
+  id: string;
+  school_id: string;
+  school_year_id: string;
+  program_id: string;
+  program_name: string;
+  donor_id: string;
+  donor_name: string;
+  donor_contact: string | null;
+  pledged_amount: number;
+  due_date: string | null;
+  status: PledgeStatus;
+  status_reason: string | null;
+  notes: string | null;
+  created_at: string;
+  fulfilled_amount: number;
+  fulfilled_cash: number;
+  fulfilled_in_kind: number;
+  remaining_amount: number;
+  fulfilment_status: PledgeFulfilment;
+}
+
+/** pta.v_donor_totals — giving history per donor, per school year. */
+export interface DonorTotals {
+  donor_id: string;
+  school_id: string;
+  school_year_id: string;
+  display_name: string;
+  donor_type: DonorType;
+  contact_number: string | null;
+  guardian_id: string | null;
+  student_id: string | null;
+  cash_given: number;
+  in_kind_given: number;
+  total_given: number;
+  donation_count: number;
+  program_count: number;
+  last_donation_at: string;
 }
 
 /** Minimal shape the Supabase client needs; RPC args/returns are typed at call sites. */

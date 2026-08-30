@@ -248,3 +248,159 @@ begin
 
   raise notice 'Seeded demo school % with 10 students.', v_school;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Donations (migration 0014): two programs, a mix of cash, in-kind and pledges.
+--
+-- Seeded as plain inserts rather than through pta.record_donation, because that
+-- RPC calls pta.current_profile_id() and this script runs with no JWT. The
+-- acknowledgement numbers and the counter are therefore set by hand, in the
+-- same format the RPC produces, and the counter is left pointing at the next
+-- free number so the first donation recorded in the UI continues the series.
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_school    uuid;
+  v_year      uuid;
+  v_year_name text;
+  v_prefix    text;
+  v_admin     uuid;
+  v_cashier   uuid;
+  v_treas     uuid;
+  v_brigada   uuid;
+  v_court     uuid;
+  v_donor     uuid;
+  v_pledge    uuid;
+  v_seq       integer := 1;
+  v_guardian  record;
+  i           integer;
+begin
+  select id, receipt_prefix into v_school, v_prefix
+  from pta.schools where school_code = 'DEMO';
+  if v_school is null then
+    raise notice 'No DEMO school; skipping donation seed.';
+    return;
+  end if;
+
+  select id, name into v_year, v_year_name
+  from pta.school_years where school_id = v_school and is_active limit 1;
+
+  select profile_id into v_admin from pta.school_users
+   where school_id = v_school and role = 'admin' limit 1;
+  select profile_id into v_cashier from pta.school_users
+   where school_id = v_school and role = 'cashier' limit 1;
+  select profile_id into v_treas from pta.school_users
+   where school_id = v_school and role = 'treasurer' limit 1;
+
+  insert into pta.donation_programs
+    (school_id, school_year_id, name, description, category,
+     target_amount, starts_on, ends_on, status, created_by)
+  values
+    (v_school, v_year, 'Brigada Eskwela ' || left(v_year_name, 4),
+     'School repair and clean-up week before classes open.',
+     'activity', 50000.00, null, null, 'open', v_admin)
+  returning id into v_brigada;
+
+  insert into pta.donation_programs
+    (school_id, school_year_id, name, description, category,
+     target_amount, status, accepts_in_kind, created_by)
+  values
+    (v_school, v_year, 'Covered Court Fund',
+     'Multi-year project to roof the school quadrangle.',
+     'project', 250000.00, 'open', false, v_admin)
+  returning id into v_court;
+
+  -- Four parents already on file give to Brigada Eskwela.
+  i := 0;
+  for v_guardian in
+    select g.id, g.first_name, g.last_name, g.contact_number
+    from pta.parents_guardians g
+    where g.school_id = v_school
+    order by g.created_at
+    limit 4
+  loop
+    i := i + 1;
+
+    insert into pta.donors
+      (school_id, donor_type, display_name, guardian_id, contact_number, created_by)
+    values
+      (v_school, 'guardian',
+       v_guardian.first_name || ' ' || v_guardian.last_name,
+       v_guardian.id, v_guardian.contact_number, v_cashier)
+    returning id into v_donor;
+
+    insert into pta.donations
+      (school_id, school_year_id, program_id, donor_id, acknowledgement_number,
+       donation_date, kind, amount, payment_method, received_by)
+    values
+      (v_school, v_year, v_brigada, v_donor,
+       v_prefix || '-' || left(v_year_name, 4) || '-D-' || lpad(v_seq::text, 6, '0'),
+       now() - (i || ' days')::interval,
+       'cash', (i * 250)::numeric, 'cash', v_cashier);
+    v_seq := v_seq + 1;
+  end loop;
+
+  -- A local business gives cash to one program and materials to the other.
+  insert into pta.donors
+    (school_id, donor_type, display_name, contact_number, created_by)
+  values
+    (v_school, 'business', 'Bayugan Hardware Supply', '09998887777', v_treas)
+  returning id into v_donor;
+
+  insert into pta.donations
+    (school_id, school_year_id, program_id, donor_id, acknowledgement_number,
+     donation_date, kind, amount, payment_method, reference_number, received_by)
+  values
+    (v_school, v_year, v_court, v_donor,
+     v_prefix || '-' || left(v_year_name, 4) || '-D-' || lpad(v_seq::text, 6, '0'),
+     now() - interval '6 days', 'cash', 10000.00, 'bank_transfer', 'BT-778812', v_treas);
+  v_seq := v_seq + 1;
+
+  insert into pta.donations
+    (school_id, school_year_id, program_id, donor_id, acknowledgement_number,
+     donation_date, kind, amount, item_description, received_by)
+  values
+    (v_school, v_year, v_brigada, v_donor,
+     v_prefix || '-' || left(v_year_name, 4) || '-D-' || lpad(v_seq::text, 6, '0'),
+     now() - interval '5 days', 'in_kind', 7500.00,
+     '20 sacks of cement and 15 sheets of plywood', v_treas);
+  v_seq := v_seq + 1;
+
+  -- One anonymous gift, so the "no donor at all" path has data.
+  insert into pta.donations
+    (school_id, school_year_id, program_id, donor_id, is_anonymous,
+     acknowledgement_number, donation_date, kind, amount, payment_method, received_by)
+  values
+    (v_school, v_year, v_brigada, null, true,
+     v_prefix || '-' || left(v_year_name, 4) || '-D-' || lpad(v_seq::text, 6, '0'),
+     now() - interval '2 days', 'cash', 500.00, 'cash', v_cashier);
+  v_seq := v_seq + 1;
+
+  -- A pledge, partly delivered — so the derived fulfilment view has all three
+  -- states represented across the seed.
+  insert into pta.donation_pledges
+    (school_id, school_year_id, program_id, donor_id, pledged_amount,
+     due_date, notes, created_by)
+  values
+    (v_school, v_year, v_court, v_donor, 25000.00,
+     (now() + interval '60 days')::date,
+     'Promised at the general assembly', v_treas)
+  returning id into v_pledge;
+
+  insert into pta.donations
+    (school_id, school_year_id, program_id, donor_id, pledge_id,
+     acknowledgement_number, donation_date, kind, amount, payment_method, received_by)
+  values
+    (v_school, v_year, v_court, v_donor, v_pledge,
+     v_prefix || '-' || left(v_year_name, 4) || '-D-' || lpad(v_seq::text, 6, '0'),
+     now() - interval '1 day', 'cash', 5000.00, 'gcash', v_cashier);
+  v_seq := v_seq + 1;
+
+  -- Leave the counter where the RPC would have left it.
+  insert into pta.donation_receipt_counters (school_id, school_year_id, next_seq)
+  values (v_school, v_year, v_seq)
+  on conflict (school_id, school_year_id) do update set next_seq = excluded.next_seq;
+
+  raise notice 'Seeded % donations across 2 programs.', v_seq - 1;
+end $$;

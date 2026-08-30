@@ -15,6 +15,12 @@ import "./globals.css";
  *
  * Inter for UI, JetBrains Mono for money and receipt numbers: both ship
  * genuine tabular figures, which is what keeps a column of pesos aligned.
+ *
+ * Neither face carries the peso sign, U+20B1 — not in `latin`, and not in
+ * `latin-ext` either (measured; adding that subset only bought an extra
+ * download that still resolved nothing). ₱ therefore comes from the fallback
+ * chain, which is set up in globals.css — see the note on --font-mono there,
+ * because getting that chain wrong is what made every ₱ collide with its digit.
  */
 const inter = Inter({
   subsets: ["latin"],

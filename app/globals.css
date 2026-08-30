@@ -13,7 +13,18 @@
      its default serif — that is the Times New Roman this app used to render. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular,
+  /* Note the literal family name: this deliberately does NOT use
+     var(--font-jetbrains-mono). That variable expands to
+     `"JetBrains Mono", "JetBrains Mono Fallback"`, and the second entry is a
+     metric-adjusted stand-in next/font builds from a local PROPORTIONAL face.
+     JetBrains Mono has no ₱ glyph, so every peso sign landed on that stand-in
+     and was drawn at 36px against a 24px digit — its ink spilling across the
+     first number, which read as "₱10,500.00" with the ₱ on top of the 1.
+     Naming the family directly skips the stand-in and lets ₱ resolve to a real
+     monospace below (Menlo measures 24.09px against the digit's 24.00px).
+     `adjustFontFallback: false` would be the tidier fix, but Turbopack does not
+     currently honour it — the stand-in still appears in the generated CSS. */
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular,
     "SF Mono", Menlo, Consolas, monospace;
   --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
