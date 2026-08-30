@@ -1,0 +1,98 @@
+- generic [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - generic [ref=f4e5]:
+      - link "PTA Collection Misamis Valley Technical School" [ref=f4e12] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=f4e13]: PTA Collection
+        - generic [ref=f4e14]: Misamis Valley Technical School
+      - list [ref=f4e18]:
+        - listitem [ref=f4e19]:
+          - link "Dashboard" [ref=f4e20] [cursor=pointer]:
+            - /url: /dashboard
+        - listitem [ref=f4e28]:
+          - link "Students" [ref=f4e29] [cursor=pointer]:
+            - /url: /students
+        - listitem [ref=f4e35]:
+          - link "Collections" [ref=f4e36] [cursor=pointer]:
+            - /url: /collections
+        - listitem [ref=f4e42]:
+          - link "Charges" [ref=f4e43] [cursor=pointer]:
+            - /url: /charges/outstanding
+        - listitem [ref=f4e49]:
+          - link "Reports" [ref=f4e50] [cursor=pointer]:
+            - /url: /reports/collections
+        - listitem [ref=f4e56]:
+          - link "Administration" [ref=f4e57] [cursor=pointer]:
+            - /url: /admin/settings
+      - list [ref=f4e64]:
+        - listitem [ref=f4e65]:
+          - button "P principal Administrator" [ref=f4e66]:
+            - generic [ref=f4e67]: P
+            - generic [ref=f4e69]:
+              - generic [ref=f4e70]: principal
+              - generic [ref=f4e71]: Administrator
+      - button "Toggle Sidebar" [ref=f4e75]
+    - main [ref=f4e76]:
+      - generic [ref=f4e77]:
+        - button "Toggle Sidebar" [ref=f4e78]
+        - navigation "breadcrumb" [ref=f4e80]:
+          - list [ref=f4e81]:
+            - listitem [ref=f4e82]:
+              - link "Collections" [ref=f4e83] [cursor=pointer]:
+                - /url: /collections
+            - listitem [ref=f4e84]
+            - listitem [ref=f4e87]:
+              - link "New" [disabled] [ref=f4e88]
+        - generic [ref=f4e89]:
+          - generic [ref=f4e90]: Misamis Valley Technical School
+          - button "Change theme" [ref=f4e96]
+      - main [ref=f4e97]:
+        - navigation "Collections pages" [ref=f4e98]:
+          - list [ref=f4e99]:
+            - listitem [ref=f4e100]:
+              - link "Payment history" [ref=f4e101] [cursor=pointer]:
+                - /url: /collections
+            - listitem [ref=f4e102]:
+              - link "Today's collections" [ref=f4e103] [cursor=pointer]:
+                - /url: /collections/today
+        - generic [ref=f4e105]:
+          - heading "New payment" [level=1] [ref=f4e106]
+          - paragraph [ref=f4e107]: Misamis Valley Technical School · 2026-2027
+        - generic [ref=f4e108]:
+          - textbox "Search student, parent, student number or LRN..." [active] [ref=f4e113]: Precious
+          - generic [ref=f4e127]:
+            - button "Bautista, Precious H. Grade 10 · Mabini · MVTS-2026-0055 ₱1,120.00 Outstanding" [ref=f4e128] [cursor=pointer]:
+              - generic [ref=f4e129]:
+                - generic [ref=f4e134]:
+                  - paragraph [ref=f4e135]: Bautista, Precious H.
+                  - paragraph [ref=f4e136]: Grade 10 · Mabini · MVTS-2026-0055
+                - generic [ref=f4e137]:
+                  - paragraph [ref=f4e138]: ₱1,120.00
+                  - generic [ref=f4e139]: Outstanding
+            - button "Flores, Precious C. Grade 7 · Sampaguita · MVTS-2026-0025 ₱0.00 Settled" [ref=f4e140] [cursor=pointer]:
+              - generic [ref=f4e141]:
+                - generic [ref=f4e146]:
+                  - paragraph [ref=f4e147]: Flores, Precious C.
+                  - paragraph [ref=f4e148]: Grade 7 · Sampaguita · MVTS-2026-0025
+                - generic [ref=f4e149]:
+                  - paragraph [ref=f4e150]: ₱0.00
+                  - generic [ref=f4e151]: Settled
+            - button "Garcia, Precious H. Grade 8 · Narra · MVTS-2026-0115 ₱620.00 Outstanding" [ref=f4e152] [cursor=pointer]:
+              - generic [ref=f4e153]:
+                - generic [ref=f4e158]:
+                  - paragraph [ref=f4e159]: Garcia, Precious H.
+                  - paragraph [ref=f4e160]: Grade 8 · Narra · MVTS-2026-0115
+                - generic [ref=f4e161]:
+                  - paragraph [ref=f4e162]: ₱620.00
+                  - generic [ref=f4e163]: Outstanding
+            - button "Gonzales, Precious C. Grade 9 · Rizal · MVTS-2026-0085 ₱0.00 Settled" [ref=f4e164] [cursor=pointer]:
+              - generic [ref=f4e165]:
+                - generic [ref=f4e170]:
+                  - paragraph [ref=f4e171]: Gonzales, Precious C.
+                  - paragraph [ref=f4e172]: Grade 9 · Rizal · MVTS-2026-0085
+                - generic [ref=f4e173]:
+                  - paragraph [ref=f4e174]: ₱0.00
+                  - generic [ref=f4e175]: Settled
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f4e120] [cursor=pointer]
+  - alert [ref=f4e176]
