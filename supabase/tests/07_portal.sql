@@ -985,9 +985,27 @@ insert into _tok select pta.portal_issue_enroll_token();
 select pta_test.ok((select (r ->> 'ok')::boolean from _tok),
   'PP101. A parent can mint an enrolment link for their OWN children');
 
--- Pressing the button twice must leave one live credential, not two.
+-- 0019. Pressing the button twice must return the SAME link, not mint a new
+-- one and kill the link already sitting in the parent's Telegram. That churn is
+-- what produced "That link has expired" in the field: tap, switch apps, feel
+-- unsure, tap again, and the link Telegram is showing is already dead.
 create temp table _tok2 (r jsonb);
 insert into _tok2 select pta.portal_issue_enroll_token();
+
+select pta_test.eq(
+  (select r ->> 'token' from _tok2), (select r ->> 'token' from _tok),
+  'PP103b. Tapping connect again returns the SAME live link');
+select pta_test.ok((select (r ->> 'reused')::boolean from _tok2),
+  'PP103c. ...and says so, rather than silently reissuing');
+
+-- "Get a new link" is the deliberate escape hatch, and that one DOES rotate.
+create temp table _tok3 (r jsonb);
+insert into _tok3 select pta.portal_issue_enroll_token(true);
+select pta_test.ok(
+  (select r ->> 'token' from _tok3) <> (select r ->> 'token' from _tok),
+  'PP103d. Forcing a refresh mints a different link');
+select pta_test.ok(not (select (r ->> 'reused')::boolean from _tok3),
+  'PP103e. ...and is not marked reused');
 select pta_test.logout();
 
 -- guardian_enroll_tokens is RLS-scoped to STAFF, so these three are asserted
@@ -1008,7 +1026,7 @@ select pta_test.eq(
   (select count(*) from pta.guardian_enroll_tokens
     where guardian_id = (select v from _ids where k='ana')
       and used_at is null and expires_at > now())::int,
-  1, 'PP104. Re-issuing retires the previous link rather than scattering them');
+  1, 'PP104. A forced refresh retires the previous link rather than scattering them');
 select pta_test.logout();
 
 select pta_test.portal_login((select v from _ids where k='ana'));
@@ -1023,7 +1041,7 @@ select pta_test.logout();
 create temp table _gcount (n int);
 insert into _gcount select count(*) from pta.parents_guardians;
 
-select pta.redeem_enroll_token((select r ->> 'token' from _tok2), '99887766', 'Ana C');
+select pta.redeem_enroll_token((select r ->> 'token' from _tok3), '99887766', 'Ana C');
 
 select pta_test.eq(
   (select count(*) from pta.parents_guardians)::int,
@@ -1044,12 +1062,44 @@ select pta_test.eq(
   2, 'PP107. One redemption switches notifications on for EVERY child');
 
 select pta_test.eq(
-  pta.redeem_enroll_token((select r ->> 'token' from _tok2), '99887766', 'Ana C') ->> 'reason',
+  pta.redeem_enroll_token((select r ->> 'token' from _tok3), '99887766', 'Ana C') ->> 'reason',
   'already_used', 'PP108. A token is single-use');
 
 select pta_test.eq(
   pta.redeem_enroll_token((select r ->> 'token' from _tok), '99887766', 'Ana C') ->> 'reason',
   'expired', 'PP109. The retired earlier token is dead');
+
+-- 0019. A chat already linked to ANOTHER guardian at this school must MOVE,
+-- not raise. guardians_telegram_idx is unique on (school_id, telegram_chat_id),
+-- and 0016's portal path assigned blindly -- so a parent whose Telegram was
+-- linked by an earlier office slip got "Something went wrong" from the bot.
+select pta_test.login(:A_ADMIN::uuid);
+create temp table _tok4 (r jsonb);
+select pta_test.logout();
+
+select pta_test.portal_login((select v from _ids where k='ben'));
+insert into _tok4 select pta.portal_issue_enroll_token(true);
+select pta_test.logout();
+
+-- Ana currently holds chat 99887766. Ben now presents the same chat.
+select pta_test.eq(
+  pta.redeem_enroll_token((select r ->> 'token' from _tok4), '99887766', 'Ben R') ->> 'ok',
+  'true', 'PP109b. Re-linking a chat held by another guardian succeeds');
+
+select pta_test.login(:A_ADMIN::uuid);
+select pta_test.eq(
+  (select telegram_chat_id from pta.parents_guardians
+    where id = (select v from _ids where k='ben')),
+  '99887766', 'PP109c. The chat moved to the guardian who just authenticated');
+select pta_test.ok(
+  (select telegram_chat_id from pta.parents_guardians
+    where id = (select v from _ids where k='ana')) is null,
+  'PP109d. ...and was released from the previous one');
+select pta_test.eq(
+  (select count(*) from pta.student_guardians
+    where guardian_id = (select v from _ids where k='ana') and notify)::int,
+  0, 'PP109e. ...which also stops notifying through the identity it left');
+select pta_test.logout();
 
 -- The office-slip path from 0013 must still behave exactly as it did.
 select pta_test.login(:A_ADMIN::uuid);

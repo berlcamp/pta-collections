@@ -78,7 +78,7 @@ export function TelegramConnect({
     };
   }, [waiting, copy.telegramDone, router, stopPolling]);
 
-  function connect() {
+  function connect(force = false) {
     setError(null);
 
     // Opened SYNCHRONOUSLY, before any await.
@@ -95,7 +95,7 @@ export function TelegramConnect({
     const popup = window.open("", "_blank");
 
     startTransition(async () => {
-      const result = await issueTelegramLink();
+      const result = await issueTelegramLink(force);
       if (!result.ok) {
         popup?.close();
         setError(result.error);
@@ -176,7 +176,10 @@ export function TelegramConnect({
           size="lg"
           className="h-12 w-full text-base"
           disabled={pending || !status.bot_username}
-          onClick={connect}
+          // Wrapped, not passed by reference: onClick hands the handler a
+          // MouseEvent, which would land in `force` and make every first tap a
+          // forced refresh — the churn 0019 exists to remove.
+          onClick={() => connect()}
         >
           {pending ? (
             <Loader2 className="mr-2 size-4 animate-spin" />
@@ -235,7 +238,7 @@ export function TelegramConnect({
             size="sm"
             className="w-full text-muted-foreground"
             disabled={pending}
-            onClick={connect}
+            onClick={() => connect(true)}
           >
             {pending && <Loader2 className="mr-2 size-4 animate-spin" />}
             {copy.telegramNewLink}

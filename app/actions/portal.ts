@@ -139,18 +139,24 @@ export async function createPortalPledge(input: unknown): Promise<ActionResult> 
  * 0013 did, and would have left the portal saying "not linked" forever while
  * the bot messaged a duplicate identity.
  */
-export async function issueTelegramLink(): Promise<
-  ActionResult<{ deepLink: string | null; expiresAt: string }>
-> {
+export async function issueTelegramLink(
+  force = false,
+): Promise<ActionResult<{ deepLink: string | null; expiresAt: string; reused: boolean }>> {
   await requirePortalSession();
 
   const supabase = await createPortalClient();
-  const { data, error } = await supabase.rpc("portal_issue_enroll_token");
+  // Default false: a repeat tap returns the link the parent is already holding
+  // in Telegram. Minting a fresh one would retire theirs mid-flow, which is
+  // what "That link has expired" was (0019).
+  const { data, error } = await supabase.rpc("portal_issue_enroll_token", {
+    p_force: force,
+  });
   if (error) return { ok: false, error: error.message };
 
   const result = data as {
     ok: boolean;
     reason?: string;
+    reused?: boolean;
     deep_link: string | null;
     expires_at: string;
   };
@@ -168,7 +174,11 @@ export async function issueTelegramLink(): Promise<
   revalidatePath("/portal/telegram");
   return {
     ok: true,
-    data: { deepLink: result.deep_link, expiresAt: result.expires_at },
+    data: {
+      deepLink: result.deep_link,
+      expiresAt: result.expires_at,
+      reused: Boolean(result.reused),
+    },
   };
 }
 
