@@ -21,6 +21,8 @@ const ACTION_LABELS: Record<string, string> = {
   USER_INVITE_CLAIMED: "Invitation claimed",
   USER_STATUS_CHANGED: "User access changed",
   SCHOOL_CREATED: "School created",
+  CARD_ASSIGNED: "Gate card assigned",
+  CARD_REVOKED: "Gate card retired",
   PROFILE_BOUND: "Profile linked",
 };
 

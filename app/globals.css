@@ -242,6 +242,37 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Parent card slip.
+
+   A card number and its bootstrap PIN are shown exactly once, in a dialog, and
+   the office needs them on paper. Routing that through /print/... would put a
+   live credential in a URL — and therefore in browser history and in any proxy
+   log between here and the printer. So the slip prints from the dialog it is
+   already in: everything else on the page is hidden, and only #parent-card-slip
+   survives onto the sheet.
+   --------------------------------------------------------------------------- */
+@media print {
+  body:has(#parent-card-slip) * {
+    visibility: hidden;
+  }
+  body:has(#parent-card-slip) #parent-card-slip,
+  body:has(#parent-card-slip) #parent-card-slip * {
+    visibility: visible;
+  }
+  #parent-card-slip {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 2rem;
+  }
+  /* The barcode must not be dithered or rescaled by a printer driver. */
+  #parent-card-slip svg {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Marketing surface.
 
    The landing page at `/` is the only public route, and it is a document, not

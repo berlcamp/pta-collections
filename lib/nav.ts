@@ -39,7 +39,12 @@ export type NavIconName =
   | "BookUser"
   | "ShieldCheck"
   | "Settings"
-  | "Building2";
+  | "Building2"
+  | "ScanLine"
+  | "Radio"
+  | "IdCard"
+  | "Smartphone"
+  | "Inbox";
 
 export interface NavItem {
   label: string;
@@ -80,6 +85,11 @@ export const SCHOOL_NAV: NavGroup[] = [
         children: [
           { label: "Payment history", href: "/collections", icon: "Receipt" },
           { label: "Today's collections", href: "/collections/today", icon: "Banknote" },
+          // Parent-submitted GCash transfers awaiting confirmation. A tab under
+          // Collections rather than its own module, because approving one runs
+          // create_payment() and lands in the same receipt series and the same
+          // daily total as anything taken at the counter.
+          { label: "Online payments", href: "/collections/claims", icon: "Inbox", capability: "reviewClaims" },
         ],
       },
       {
@@ -134,6 +144,7 @@ export const SCHOOL_NAV: NavGroup[] = [
           { label: "School years", href: "/admin/school-years", icon: "CalendarRange", capability: "manageSchoolYears" },
           { label: "Sections", href: "/admin/sections", icon: "BookUser", capability: "manageSections" },
           { label: "Users", href: "/admin/users", icon: "Users", capability: "manageUsers" },
+          { label: "Parent cards", href: "/admin/parent-cards", icon: "Smartphone", capability: "issueParentCard" },
           { label: "Audit logs", href: "/admin/audit-logs", icon: "ShieldCheck", capability: "viewAuditLogs" },
         ],
       },
@@ -152,6 +163,20 @@ export const SUPER_NAV: NavGroup[] = [
         children: [
           { label: "Overview", href: "/super", icon: "LayoutDashboard" },
           { label: "Schools", href: "/super/schools", icon: "Building2" },
+        ],
+      },
+      {
+        // The RFID gate. Its own module rather than a tab under Super admin:
+        // nothing here is money, and the two pages are used by different people
+        // at different times — the monitor during the morning rush, enrolment
+        // when a card is handed over. Both are school-scoped by a picker on the
+        // page, because a super admin arrives here without an active school.
+        label: "Gate attendance",
+        href: "/super/attendance",
+        icon: "ScanLine",
+        children: [
+          { label: "Live monitor", href: "/super/attendance", icon: "Radio" },
+          { label: "Card enrolment", href: "/super/cards", icon: "IdCard" },
         ],
       },
     ],

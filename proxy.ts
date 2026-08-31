@@ -24,6 +24,18 @@ const LANDING_PATH = "/";
  * project-wide and would break construction-saas and sms-demo.
  */
 export async function proxy(request: NextRequest) {
+  // The parent portal is a SECOND identity system and this gate knows nothing
+  // about it. A portal session is a custom JWT in its own cookie with no
+  // auth.users row behind it, so supabase.auth.getUser() below would return
+  // null for a perfectly valid parent and bounce them to the STAFF sign-in.
+  //
+  // Short-circuit before that call — not merely inside the isPublic test, which
+  // runs after it. /portal does its own gating in app/(portal)/portal/layout.tsx,
+  // against pta.portal_accounts, and RLS refuses everything either way.
+  if (request.nextUrl.pathname.startsWith("/portal")) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

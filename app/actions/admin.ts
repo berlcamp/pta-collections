@@ -161,18 +161,65 @@ export async function saveSchoolSettings(input: unknown): Promise<ActionResult> 
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
+  // The two portal keys live in pta.school_settings, not as columns on
+  // pta.schools, so they are split out before the update rather than passed
+  // through with the rest.
+  const { gcash_number, telegram_bot_username, portal_require_pin, ...schoolColumns } =
+    parsed.data;
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("schools")
     .update({
-      ...parsed.data,
-      receipt_prefix: parsed.data.receipt_prefix.toUpperCase(),
+      ...schoolColumns,
+      receipt_prefix: schoolColumns.receipt_prefix.toUpperCase(),
     })
     .eq("id", ctx.activeSchool.id);
 
   if (error) return { ok: false, error: error.message };
 
+  // Ordinary RLS table writes: school_settings is configuration, gated on the
+  // admin role by school_settings_admin_write (0006). No RPC — nothing here is
+  // money or identity.
+  //
+  // Stored as bare JSON strings. pta.v_portal_account and v_portal_telegram
+  // read them with coalesce(value ->> '<key>', value #>> '{}'), so a row
+  // hand-written as an object in the SQL editor still resolves.
+  const settings = [
+    { key: "gcash_number", value: gcash_number },
+    { key: "telegram_bot", value: telegram_bot_username },
+    // Stored only when TRUE. pta.portal_pin_required() defaults to false, so an
+    // absent row and a stored `false` mean the same thing — and one of them is
+    // a row nobody has to reason about later.
+    { key: "portal_require_pin", value: portal_require_pin ? true : "" },
+  ];
+
+  for (const { key, value } of settings) {
+    const stored = typeof value === "boolean" ? value : (value ?? "").trim();
+
+    if (stored === "") {
+      // Cleared, not stored empty: an empty string would make the portal print
+      // a blank GCash number rather than omit the step.
+      const { error: delError } = await supabase
+        .from("school_settings")
+        .delete()
+        .eq("school_id", ctx.activeSchool.id)
+        .eq("key", key);
+      if (delError) return { ok: false, error: delError.message };
+      continue;
+    }
+
+    const { error: upError } = await supabase
+      .from("school_settings")
+      .upsert(
+        { school_id: ctx.activeSchool.id, key, value: stored },
+        { onConflict: "school_id,key" },
+      );
+    if (upError) return { ok: false, error: upError.message };
+  }
+
   revalidatePath("/admin/settings");
+  revalidatePath("/portal", "layout");
   revalidatePath("/", "layout");
   return { ok: true, data: undefined };
 }

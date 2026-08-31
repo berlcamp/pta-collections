@@ -26,6 +26,7 @@ import {
   FormMessage,
   RequiredMark,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { schoolSettingsSchema } from "@/lib/validations/admin";
@@ -34,7 +35,17 @@ import type { School } from "@/types/database.types";
 
 type SettingsValues = z.infer<typeof schoolSettingsSchema>;
 
-export function SchoolSettingsForm({ school }: { school: School }) {
+export function SchoolSettingsForm({
+  school,
+  gcashNumber,
+  telegramBotUsername,
+  requirePin,
+}: {
+  school: School;
+  gcashNumber: string;
+  telegramBotUsername: string;
+  requirePin: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -53,6 +64,9 @@ export function SchoolSettingsForm({ school }: { school: School }) {
       receipt_prefix: school.receipt_prefix,
       receipt_footer_text: school.receipt_footer_text ?? "",
       timezone: school.timezone,
+      gcash_number: gcashNumber,
+      telegram_bot_username: telegramBotUsername,
+      portal_require_pin: requirePin,
     },
   });
 
@@ -280,6 +294,103 @@ export function SchoolSettingsForm({ school }: { school: School }) {
                   <FormDescription>
                     Defines the day boundary for daily collections and every
                     report. Changing it shifts which day a payment is counted in.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Parent Portal</CardTitle>
+            <CardDescription>
+              Two settings the Parent Portal needs. Both are optional — leave a
+              field blank and the portal simply omits that step rather than
+              showing a parent something half-configured.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="gcash_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>PTA GCash number</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="w-56 font-mono"
+                      placeholder="0917 000 1234"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Printed on the payment screen as the number a parent sends
+                    money to. This app never touches GCash itself — a parent
+                    transfers out of band and submits the reference number,
+                    which a cashier confirms before any receipt is issued.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="portal_require_pin"
+              render={({ field }) => (
+                <FormItem className="rounded-lg border p-4">
+                  <div className="flex items-start gap-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={(v) => field.onChange(v === true)}
+                        className="mt-0.5"
+                      />
+                    </FormControl>
+                    <div className="space-y-1">
+                      <FormLabel>Also require a PIN to sign in</FormLabel>
+                      <FormDescription>
+                        Off, the 16-digit barcode alone signs a parent in. That
+                        card is worn on a lanyard, is readable from a
+                        photograph, and is scanned at your counter by cashiers
+                        all day &mdash; so anyone holding the number can see a
+                        child&apos;s gate arrivals and submit payments in the
+                        family&apos;s name. On, each parent also enters a
+                        6-digit PIN they choose themselves.
+                        <br />
+                        Switching this on later costs nothing: no card is
+                        reissued, and every card already carries a PIN the
+                        office can read out.
+                      </FormDescription>
+                    </div>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="telegram_bot_username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Telegram bot username</FormLabel>
+                  <FormControl>
+                    <Input
+                      className="w-72 font-mono"
+                      placeholder="MyschoolGateBot"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    The bot @BotFather gave you, without the @. It builds the
+                    one-tap link on the portal&apos;s notification page. Until
+                    it is set, that page tells parents the school has not
+                    finished setting up its bot yet.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

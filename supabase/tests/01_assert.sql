@@ -43,6 +43,22 @@ begin
   end;
 end $$;
 
+-- The inverse of throws(): asserts a statement is ALLOWED. Needed wherever a
+-- write is permitted but the writer cannot read the row back -- an RLS insert
+-- policy with no matching select policy, which is exactly the shape of a
+-- parent uploading a proof-of-payment screenshot.
+create or replace function pta_test.no_throw(p_sql text, p_description text)
+returns void language plpgsql as $$
+begin
+  begin
+    execute p_sql;
+    insert into pta_test.results (description, passed) values (p_description, true);
+  exception when others then
+    insert into pta_test.results (description, passed, detail)
+    values (p_description, false, sqlerrm);
+  end;
+end $$;
+
 -- Impersonate a user for RLS testing, exactly as PostgREST would.
 --
 -- Session-scoped (set_config is_local = false), NOT transaction-scoped: psql
@@ -53,6 +69,21 @@ returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claims',
                      json_build_object('sub', p_auth_uid, 'role', 'authenticated')::text,
+                     false);
+  execute 'set role authenticated';
+end $$;
+
+-- Impersonate a PORTAL guardian (0016). A portal session is a custom JWT with
+-- role 'authenticated' and a guardian_id claim, and NO auth.users row behind
+-- its sub -- which is exactly why a guardian cannot be a pta.profiles row.
+-- Passing no sub at all is faithful to that: current_profile_id() must come
+-- back null for these sessions.
+create or replace function pta_test.portal_login(p_guardian_id uuid)
+returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+                     json_build_object('role', 'authenticated',
+                                       'guardian_id', p_guardian_id)::text,
                      false);
   execute 'set role authenticated';
 end $$;

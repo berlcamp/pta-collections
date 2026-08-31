@@ -404,3 +404,73 @@ begin
 
   raise notice 'Seeded % donations across 2 programs.', v_seq - 1;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- The RFID gate (migrations 0013 / 0015).
+--
+-- One reader, cards for six of the ten students, and this morning's taps —
+-- including two cards nobody owns, so the enrolment queue on
+-- /super/cards has something in it and the live monitor has both an
+-- "arrived" and a "not yet" half. Times are built from the Manila day start so
+-- the board looks like a school morning whenever the seed is run.
+-- ---------------------------------------------------------------------------
+
+do $$
+declare
+  v_school uuid;
+  v_day    timestamptz;
+begin
+  select id into v_school from pta.schools where school_code = 'DEMO';
+  if v_school is null then
+    return;
+  end if;
+
+  v_day := date_trunc('day', now() at time zone 'Asia/Manila') at time zone 'Asia/Manila';
+
+  insert into pta.gate_devices (device_id, school_id, label)
+  values ('demo-main-gate', v_school, 'Main gate')
+  on conflict (device_id) do nothing;
+
+  -- Six cards. The UIDs are uppercase hex because that is what the Wiegand
+  -- decoder emits and what pta.student_cards has a CHECK for.
+  insert into pta.student_cards (school_id, student_id, card_uid)
+  select r.school_id, r.student_id,
+         upper(lpad(to_hex(1000000 + x.n::int), 8, '0'))
+  from (select student_id, school_id,
+               row_number() over (order by full_name) as n
+          from pta.gate_roster where school_id = v_school) x
+  join pta.gate_roster r
+    on r.student_id = x.student_id and r.school_id = x.school_id
+  where x.n <= 6;
+
+  -- Arrivals, a few minutes apart from 06:34.
+  perform pta.record_attendance((
+    select jsonb_agg(jsonb_build_object(
+      'event_id',     gen_random_uuid(),
+      'device_id',    'demo-main-gate',
+      'card_uid',     x.card_uid,
+      'scanned_at',   v_day + make_interval(hours => 6, mins => (30 + x.n * 4)::int),
+      'clock_synced', true))
+    from (select c.card_uid, row_number() over (order by c.card_uid) as n
+            from pta.student_cards c
+           where c.school_id = v_school and c.revoked_at is null) x
+  ));
+
+  -- Two cards belonging to nobody: the enrolment queue. The second tap of
+  -- 0FA1CE01 arrives with clock_synced false and queued true, so the monitor's
+  -- "estimated time" and "delivered late" badges both have a row to sit on.
+  perform pta.record_attendance(jsonb_build_array(
+    jsonb_build_object('event_id', gen_random_uuid(), 'device_id', 'demo-main-gate',
+      'card_uid', '0FA1CE01', 'scanned_at', v_day + interval '6 hours 41 minutes',
+      'clock_synced', true),
+    jsonb_build_object('event_id', gen_random_uuid(), 'device_id', 'demo-main-gate',
+      'card_uid', '0FA1CE01', 'scanned_at', v_day + interval '7 hours 12 minutes',
+      'clock_synced', false, 'queued', true),
+    jsonb_build_object('event_id', gen_random_uuid(), 'device_id', 'demo-main-gate',
+      'card_uid', 'C0FFEE99', 'scanned_at', v_day + interval '7 hours 26 minutes',
+      'clock_synced', true)
+  ));
+
+  raise notice 'Seeded a gate reader, 6 cards and % scans.',
+    (select count(*) from pta.attendance where school_id = v_school);
+end $$;

@@ -65,4 +65,27 @@ export const schoolSettingsSchema = z.object({
     .regex(/^[A-Za-z0-9]{2,10}$/, "2–10 letters or digits."),
   receipt_footer_text: z.string().trim().max(300).optional().nullable(),
   timezone: z.string().trim().min(3),
+
+  // Parent portal. These two live in pta.school_settings rather than as columns
+  // on pta.schools -- they configure a surface outside this app (a payment rail
+  // and a Telegram bot), and school_settings is where per-school configuration
+  // that is not printed on a receipt belongs.
+  gcash_number: z.string().trim().max(40).optional().nullable(),
+  telegram_bot_username: z
+    .string()
+    .trim()
+    .max(64)
+    // BotFather's own rule. Accepting a leading @ and stripping it saves the
+    // support call: everybody copies the handle with the @ attached, and the
+    // deep link https://t.me/@Bot is a 404.
+    .transform((v) => (v ?? "").replace(/^@/, ""))
+    .refine(
+      (v) => v === "" || /^[A-Za-z0-9_]{5,32}$/.test(v),
+      "A bot username is 5–32 letters, digits or underscores.",
+    )
+    .optional()
+    .nullable(),
+  // 0017. Off means the 16-digit barcode alone signs a parent in — a
+  // single-factor bearer credential that cashiers read at the POS all day.
+  portal_require_pin: z.boolean(),
 });

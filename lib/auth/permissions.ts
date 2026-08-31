@@ -32,6 +32,12 @@ export const CAPABILITIES = {
   viewReports: ["admin", "treasurer", "viewer", "cashier"],
   exportReports: ["admin", "treasurer"],
   viewAuditLogs: ["admin", "treasurer"],
+  // Parent portal. Issuing a card is an IDENTITY decision — it decides who can
+  // watch a child through the school gate — so cashiers are excluded even
+  // though they may take money all day. Reviewing a claim is the same act as
+  // taking a payment at the counter, so it carries the same three roles.
+  issueParentCard: ["admin", "treasurer"],
+  reviewClaims: ["admin", "cashier", "treasurer"],
 } as const satisfies Record<string, readonly SchoolRole[]>;
 
 export type Capability = keyof typeof CAPABILITIES;

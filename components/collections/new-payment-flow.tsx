@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Search, UserRound } from "lucide-react";
+import { CreditCard, Loader2, Search, UserRound } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/browser";
+import { looksLikeCardScan, normalizeCardNumber } from "@/lib/portal/card";
 import { formatMoney } from "@/lib/financial/money";
 import { formatNameListing } from "@/lib/utils/names";
 import { PaymentComposer } from "./payment-composer";
@@ -47,6 +48,15 @@ export function NewPaymentFlow({
   // Clearing via setState inside the effect would trigger a cascading render.
   const visibleHits = term.length < 2 ? [] : hits;
 
+  // A parent card scanned into this box, resolved to that guardian's children.
+  //
+  // A barcode scanner IS a keyboard: it types the 16 digits and presses Enter,
+  // so there is no hardware integration and no second screen — the box simply
+  // learns to recognise what was typed. The Luhn check digit is what tells a
+  // card from a 16-digit LRN, and it is verified in the browser so a misread
+  // scan never becomes a server round trip.
+  const [scannedGuardian, setScannedGuardian] = useState<string | null>(null);
+
   useEffect(() => {
     if (term.length < 2) return;
 
@@ -54,6 +64,51 @@ export function NewPaymentFlow({
     const timer = setTimeout(async () => {
       setLoading(true);
       const supabase = createClient();
+
+      if (looksLikeCardScan(term)) {
+        // lookup_parent_card returns people, never the credential — and refuses
+        // outright for a card belonging to another school.
+        const { data } = await supabase.rpc("lookup_parent_card", {
+          p_card_number: normalizeCardNumber(term),
+        });
+        const rows = (data ?? []) as {
+          guardian_name: string;
+          student_id: string;
+          student_name: string;
+          student_no: string | null;
+          grade_level: string | null;
+          section_name: string | null;
+          outstanding: number;
+        }[];
+
+        if (!cancelled) {
+          setScannedGuardian(rows[0]?.guardian_name ?? null);
+          setHits(
+            rows.map((row) => {
+              // student_name arrives already rendered by pta.display_name();
+              // split it back into the shape this list expects rather than
+              // teaching the row component a second name format.
+              const [last, rest] = row.student_name.split(",");
+              return {
+                student_id: row.student_id,
+                first_name: (rest ?? "").trim(),
+                middle_name: null,
+                last_name: (last ?? row.student_name).trim(),
+                suffix: null,
+                grade_level: row.grade_level ?? "",
+                section_name: row.section_name,
+                student_number: row.student_no,
+                outstanding: Number(row.outstanding ?? 0),
+              };
+            }),
+          );
+          setCursor(0);
+          setLoading(false);
+        }
+        return;
+      }
+
+      setScannedGuardian(null);
       const escaped = term.replace(/[%,()]/g, " ");
       const { data } = await supabase
         .from("v_student_payment_status")
@@ -125,14 +180,23 @@ export function NewPaymentFlow({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Search student, parent, student number or LRN..."
+          placeholder="Scan a parent card, or search name, student number or LRN..."
           className="h-14 pl-12 text-base"
         />
       </div>
 
+      {scannedGuardian && (
+        <p className="mt-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+          <CreditCard className="size-4 text-muted-foreground" />
+          Parent card &mdash; <span className="font-medium">{scannedGuardian}</span>
+        </p>
+      )}
+
       {term.length >= 2 && visibleHits.length === 0 && !loading && (
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          No students match &ldquo;{query}&rdquo;.
+          {looksLikeCardScan(term)
+            ? "That parent card is not registered at this school."
+            : `No students match \u201C${query}\u201D.`}
         </p>
       )}
 
