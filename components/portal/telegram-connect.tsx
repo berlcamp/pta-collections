@@ -80,22 +80,45 @@ export function TelegramConnect({
 
   function connect() {
     setError(null);
+
+    // Opened SYNCHRONOUSLY, before any await.
+    //
+    // Mobile Safari only allows window.open inside a live user gesture, and an
+    // awaited server call ends that gesture — so opening the tab after the mint
+    // was silently blocked on every iPhone. The fix is the standard one: claim
+    // a blank tab now, while the tap is still in scope, and point it at the
+    // deep link once the token comes back.
+    //
+    // No "noopener" feature string here, deliberately: passing it makes
+    // window.open return null by specification, which would throw away the very
+    // handle this needs. opener is nulled by hand below instead.
+    const popup = window.open("", "_blank");
+
     startTransition(async () => {
       const result = await issueTelegramLink();
       if (!result.ok) {
+        popup?.close();
         setError(result.error);
         return;
       }
       if (!result.data.deepLink) {
+        popup?.close();
         setError(copy.telegramNoBot);
         return;
       }
 
       setLink(result.data.deepLink);
       setWaiting(true);
-      // Opened rather than navigated: the portal tab stays put, so the "did it
-      // work?" block is still there when they switch back.
-      window.open(result.data.deepLink, "_blank", "noopener");
+
+      // A new tab rather than a navigation: the portal page has to survive, or
+      // the "did it work?" block is gone when they switch back from Telegram.
+      if (popup && !popup.closed) {
+        popup.opener = null;
+        popup.location.replace(result.data.deepLink);
+      }
+      // If it WAS blocked, popup is null and nothing opens — which is exactly
+      // what the anchor below is for. It is a real link, so the tap on it is
+      // its own gesture and no blocker applies.
     });
   }
 
@@ -148,19 +171,32 @@ export function TelegramConnect({
 
   return (
     <div className="space-y-3">
-      <Button
-        size="lg"
-        className="h-12 w-full text-base"
-        disabled={pending || !status.bot_username}
-        onClick={connect}
-      >
-        {pending ? (
-          <Loader2 className="mr-2 size-4 animate-spin" />
-        ) : (
-          <ExternalLink className="mr-2 size-4" />
-        )}
-        {copy.telegramConnect}
-      </Button>
+      {!link ? (
+        <Button
+          size="lg"
+          className="h-12 w-full text-base"
+          disabled={pending || !status.bot_username}
+          onClick={connect}
+        >
+          {pending ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <ExternalLink className="mr-2 size-4" />
+          )}
+          {copy.telegramConnect}
+        </Button>
+      ) : (
+        // Once a link exists it is always on screen as a REAL anchor. Whether
+        // the tab above opened, was blocked, or was closed by mistake, there is
+        // one obvious thing to tap — and tapping a link is its own gesture, so
+        // no popup blocker is involved.
+        <Button asChild size="lg" className="h-12 w-full text-base">
+          <a href={link} target="_blank" rel="noopener noreferrer">
+            <ExternalLink className="mr-2 size-4" />
+            {copy.telegramTapToOpen}
+          </a>
+        </Button>
+      )}
 
       {!status.bot_username && (
         <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
@@ -178,12 +214,33 @@ export function TelegramConnect({
         </div>
       )}
 
-      {/* The link is offered as text too, for the parent reading this on a
-          laptop with Telegram on a different device. */}
-      {link && !waiting && (
-        <p className="break-all rounded-lg bg-muted p-3 text-center font-mono text-xs">
-          {link}
-        </p>
+      {/* Plain text as the last resort — for a parent on a laptop with Telegram
+          on a different phone, and for anything the two paths above miss.
+          Deliberately NOT gated on !waiting: it was, and since waiting is set in
+          the same breath as the link, the fallback could never appear at the one
+          moment it was needed. */}
+      {link && (
+        <div className="space-y-1.5">
+          <p className="text-center text-xs text-muted-foreground">
+            {copy.telegramDidNotOpen}
+          </p>
+          <p className="break-all rounded-lg bg-muted p-3 text-center font-mono text-xs">
+            {link}
+          </p>
+          <p className="text-center text-xs text-muted-foreground">
+            {copy.telegramLinkExpiresIn}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground"
+            disabled={pending}
+            onClick={connect}
+          >
+            {pending && <Loader2 className="mr-2 size-4 animate-spin" />}
+            {copy.telegramNewLink}
+          </Button>
+        </div>
       )}
 
       {error && (

@@ -147,6 +147,11 @@ const en = {
     "The school has not finished setting up its Telegram bot yet. Please check back later.",
   telegramLinkExpired: "That link has expired. Tap the button again for a new one.",
   telegramUnlinked: "Disconnected. You will no longer get gate messages.",
+  telegramTapToOpen: "Tap here to open Telegram",
+  telegramDidNotOpen:
+    "Did it not open? Copy this link and paste it into your browser:",
+  telegramNewLink: "Get a new link",
+  telegramLinkExpiresIn: "This link works for the next 15 minutes.",
 
   // Common
   loading: "Loading…",
@@ -278,6 +283,11 @@ const tl: Copy = {
     "Expired na ang link na iyan. Pindutin muli ang button para sa bago.",
   telegramUnlinked:
     "Na-disconnect na. Hindi na kayo makakatanggap ng mensahe mula sa gate.",
+  telegramTapToOpen: "Pindutin dito para buksan ang Telegram",
+  telegramDidNotOpen:
+    "Hindi nagbukas? Kopyahin ang link na ito at i-paste sa inyong browser:",
+  telegramNewLink: "Kumuha ng bagong link",
+  telegramLinkExpiresIn: "Gumagana ang link na ito sa loob ng 15 minuto.",
 
   loading: "Naglo-load…",
   cancel: "Kanselahin",
