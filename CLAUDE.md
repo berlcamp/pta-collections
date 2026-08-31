@@ -182,7 +182,9 @@ one taken at the counter — same receipt series, same daily report.
   are set in the app, at **Administration → Settings → Parent Portal**
   (admin only). They are stored as
   `school_settings` rows keyed `gcash_number`, `telegram_bot` and
-  `portal_require_pin`. Both readers
+  `portal_require_pin`. `0018` re-asserts the two Telegram readers after `0016`
+  was wrongly corrected in place: an applied migration is history, and a fix to
+  one belongs in a new file. Both readers
   accept either a bare JSON string or `{"number": ...}` / `{"username": ...}`,
   because that table gets hand-edited in the SQL editor. Leave either blank and
   the portal omits that step rather than showing a half-configured screen.

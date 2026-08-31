@@ -515,6 +515,34 @@ select pta_test.portal_login((select v from _ids where k='ana'));
 select pta_test.eq((select bot_username from pta.v_portal_telegram), 'OnhsGateBot',
   'PP40i. ...and so does the object shape a hand-edit would produce');
 
+-- 0018. The deep link is built inside portal_issue_enroll_token(), which does
+-- its OWN lookup of the bot username -- so the view being tolerant is not
+-- enough. 0016 read only {"username": ...} in both places, and the settings
+-- form writes a bare string, which is how a configured school came to be told
+-- it had not configured anything.
+select pta_test.ok(
+  (pta.portal_issue_enroll_token() -> 'deep_link') <> 'null'::jsonb,
+  'PP40j. The deep link is built from an object-shaped bot setting');
+
+select pta_test.logout();
+select pta_test.login(:A_ADMIN::uuid);
+update pta.school_settings set value = '"OnhsGateBot"'::jsonb
+ where school_id = (select v from _ids where k='onhs') and key = 'telegram_bot';
+select pta_test.logout();
+
+select pta_test.portal_login((select v from _ids where k='ana'));
+select pta_test.eq((select bot_username from pta.v_portal_telegram), 'OnhsGateBot',
+  'PP40k. A bare-string setting resolves in the view');
+-- Minted ONCE and held: every call to portal_issue_enroll_token() retires the
+-- previous token and returns a new one, so calling it twice inside one
+-- assertion compares two different links.
+create temp table _link (r jsonb);
+insert into _link select pta.portal_issue_enroll_token();
+select pta_test.eq(
+  (select r ->> 'deep_link' from _link),
+  'https://t.me/OnhsGateBot?start=' || (select r ->> 'token' from _link),
+  'PP40l. ...and in the deep link the connect button opens');
+
 -- current_profile_id() must be null: a portal session is NOT a staff identity,
 -- and anything that assumed otherwise would stamp a guardian onto a payment.
 select pta_test.ok(pta.current_profile_id() is null,
