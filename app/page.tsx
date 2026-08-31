@@ -9,13 +9,17 @@ import {
   FileBarChart,
   FileSpreadsheet,
   GraduationCap,
+  HandCoins,
+  IdCard,
   Eye,
   LayoutDashboard,
   Lock,
   Receipt,
+  ScanLine,
   ScrollText,
   Settings,
   ShieldCheck,
+  Smartphone,
   Wallet,
 } from "lucide-react";
 
@@ -42,6 +46,30 @@ export const metadata = {
   description:
     "Assess annual PTA dues, record cashier payments, print receipts and close the year-end report. Multi-tenant, invitation-only, and auditable down to the peso.",
 };
+
+/** What the portal actually does, in the order a parent cares about it. */
+const PARENT_FEATURES = [
+  {
+    icon: ScanLine,
+    title: "Gate attendance",
+    body: "See the moment your child taps in at the school gate, with the photo the reader takes.",
+  },
+  {
+    icon: Smartphone,
+    title: "Telegram alerts",
+    body: "Get a message the moment they arrive. One tap to switch on, and off whenever you like.",
+  },
+  {
+    icon: Wallet,
+    title: "Fees and receipts",
+    body: "What is still due, and every official receipt you have been issued, in one list.",
+  },
+  {
+    icon: HandCoins,
+    title: "Pay and give",
+    body: "Send your payment by GCash and submit the reference. Support PTA projects the same way.",
+  },
+] as const;
 
 const MODULES = [
   {
@@ -226,6 +254,23 @@ export default function LandingPage() {
               >
                 Access is by invitation. Your school administrator sends it; there
                 are no passwords.
+              </p>
+
+              {/* The first thing a PARENT needs, and the paragraph above is not
+                  addressed to them — they were handed a card, not invited to a
+                  Google account. Straight to the portal, in their words. */}
+              <p
+                className="rise mt-3 text-sm text-sidebar-foreground/70"
+                style={{ animationDelay: "400ms" }}
+              >
+                Parent with a PTA card?{" "}
+                <Link
+                  href="/portal/login"
+                  className="font-medium text-sidebar-primary underline-offset-4 hover:underline"
+                >
+                  Sign in to the Parent Portal
+                  <ArrowRight data-icon="inline-end" className="inline size-3.5" />
+                </Link>
               </p>
             </div>
 
@@ -442,6 +487,66 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ── Parents ──────────────────────────────────────────────────────
+            Its own band, not a bullet under a feature list. Everything else on
+            this page is addressed to the school that buys the software; this is
+            addressed to the few hundred people per school who will actually
+            open it, and who arrive holding a card rather than an invitation. */}
+        <section id="parents" className="border-y border-border bg-muted/40">
+          <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+            <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr]">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 font-mono text-[0.7rem] tracking-widest uppercase text-muted-foreground">
+                  <IdCard className="size-3.5" />
+                  For parents and guardians
+                </p>
+
+                <h2 className="display-serif mt-6 text-3xl font-semibold text-balance sm:text-4xl">
+                  Your child&apos;s day, and your balance,{" "}
+                  <span className="text-primary italic">in your pocket.</span>
+                </h2>
+
+                <p className="mt-5 max-w-xl text-lg text-pretty text-muted-foreground">
+                  Your school gives you a card with a 16-digit number under the
+                  barcode. That number is your sign-in &mdash; there is nothing
+                  to install and no account to create.
+                </p>
+
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  <Button asChild size="lg">
+                    <Link href="/portal/login">
+                      Sign in with your parent card
+                      <ArrowRight data-icon="inline-end" className="size-4" />
+                    </Link>
+                  </Button>
+                </div>
+
+                <p className="mt-5 text-sm text-muted-foreground">
+                  No card yet? Ask the school office &mdash; they can print one
+                  for you while you wait.
+                </p>
+              </div>
+
+              <ul className="grid gap-4 sm:grid-cols-2">
+                {PARENT_FEATURES.map((f) => (
+                  <li
+                    key={f.title}
+                    className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+                  >
+                    <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <f.icon className="size-5" />
+                    </span>
+                    <p className="mt-4 font-medium">{f.title}</p>
+                    <p className="mt-1.5 text-sm text-pretty text-muted-foreground">
+                      {f.body}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
         {/* ── Sign in ──────────────────────────────────────────────────── */}
         <section className="bg-background">
           <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
@@ -472,6 +577,16 @@ export default function LandingPage() {
                   <Button asChild size="lg" variant="outline">
                     <a href="#modules">Browse the modules</a>
                   </Button>
+                </div>
+                {/* A parent who scrolled this far and read "Google account"
+                    needs a way out of the staff funnel, not a dead end. */}
+                <div className="mt-6">
+                  <Link
+                    href="/portal/login"
+                    className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    Looking for the Parent Portal? Sign in with your card
+                  </Link>
                 </div>
               </div>
             </div>

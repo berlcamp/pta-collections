@@ -51,11 +51,22 @@ export function SiteFooter() {
           <ul className="mt-3 space-y-2 text-sidebar-foreground/70">
             <li>
               <Link href="/login" className="transition-colors hover:text-sidebar-foreground">
-                Sign in
+                School sign in
               </Link>
             </li>
             <li className="text-sidebar-foreground/50">
               Invitation only &mdash; ask your school administrator.
+            </li>
+            <li className="pt-2">
+              <Link
+                href="/portal/login"
+                className="transition-colors hover:text-sidebar-foreground"
+              >
+                Parent sign in
+              </Link>
+            </li>
+            <li className="text-sidebar-foreground/50">
+              Use the number on your PTA parent card.
             </li>
           </ul>
         </nav>

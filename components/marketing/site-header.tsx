@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, IdCard } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 const SECTIONS = [
   { href: "#modules", label: "Modules" },
   { href: "#how", label: "How it works" },
+  { href: "#parents", label: "For parents" },
   { href: "#roles", label: "Roles" },
   { href: "#trust", label: "Controls" },
 ] as const;
@@ -51,12 +52,32 @@ export function SiteHeader() {
           <div className="text-sidebar-foreground/80 [&_button:hover]:bg-sidebar-accent [&_button:hover]:text-sidebar-accent-foreground">
             <ThemeToggle />
           </div>
+          {/* Two doors, and the parent one comes first because there are a
+              few hundred parents to every handful of staff. It is the ghost
+              button so the school-facing CTA still reads as primary — the
+              school is who chooses this software, the parents are who use it.
+              The label shortens on small screens so both fit beside the logo. */}
+          <Button
+            asChild
+            size="sm"
+            variant="ghost"
+            className="border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground dark:hover:bg-sidebar-accent"
+          >
+            <Link href="/portal/login">
+              <IdCard className="size-4" />
+              <span className="hidden sm:inline">Parent sign in</span>
+              <span className="sm:hidden">Parents</span>
+            </Link>
+          </Button>
           <Button
             asChild
             size="sm"
             className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/85"
           >
-            <Link href="/login">Sign in</Link>
+            <Link href="/login">
+              <span className="hidden sm:inline">School sign in</span>
+              <span className="sm:hidden">School</span>
+            </Link>
           </Button>
         </div>
       </div>
