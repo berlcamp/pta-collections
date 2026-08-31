@@ -89,4 +89,10 @@ export const schoolSettingsSchema = z.object({
   // 0017. Off means the 16-digit barcode alone signs a parent in — a
   // single-factor bearer credential that cashiers read at the POS all day.
   portal_require_pin: z.boolean(),
+  // Gate notifications live in pta.gate_notify_config, not school_settings --
+  // one row per school, carrying the staleness thresholds too. Absent row means
+  // OFF: claim_notifications() returns early on `not found`, silently, which is
+  // indistinguishable from a broken trigger. This checkbox is what stops that
+  // being a SQL step somebody forgets.
+  gate_notify_enabled: z.boolean(),
 });

@@ -189,6 +189,34 @@ one taken at the counter — same receipt series, same daily report.
   because that table gets hand-edited in the SQL editor. Leave either blank and
   the portal omits that step rather than showing a half-configured screen.
 
+### Setting up a NEW school
+Most of it fails quietly, which is why `/super/schools/[id]` carries a setup
+checklist that computes each item from the database. The three that fail
+silently, and look identical to a broken deployment:
+
+- **`pta.gate_notify_config`** — no row means gate notifications are OFF.
+  `claim_notifications()` returns on `not found` without writing a
+  `gate_notifications` row, so the gate records every tap and sends nothing.
+  Nothing auto-creates it; the checkbox in Settings → Parent Portal does.
+- **An active `school_year`** — without it `gate_roster` is empty, the portal
+  shows no children, and no payment can be recorded (`pta.payments` has an FK
+  to `student_enrollments`).
+- **`school_settings.telegram_bot` / `gcash_number`** — the portal omits the
+  step rather than announcing the gap.
+
+Per school, hardware included: a `gate_devices` row mapping a device id to the
+school (the tenancy key — `record_attendance()` refuses an unregistered device),
+and an ESP32 flashed with that `DEVICE_ID`.
+
+One-time and never repeated: the migrations, `esp32/sql/webhook.sql` (the
+trigger is on the `pta.attendance` TABLE, so it covers every school), both Edge
+Functions, Telegram's `setWebhook`, and `SUPABASE_JWT_SECRET`.
+
+**There is one `TELEGRAM_BOT_TOKEN` for the whole deployment.** The per-school
+`telegram_bot` setting only builds the deep link; sending uses that single
+token, so every school shares one bot until `notify-guardian` learns to look a
+token up per school.
+
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through
   `SECURITY DEFINER` RPCs in `pta`. Never write `payments` or `donations` from

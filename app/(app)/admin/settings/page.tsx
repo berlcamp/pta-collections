@@ -13,11 +13,18 @@ export default async function SettingsPage() {
   // app -- a payment rail and a Telegram bot -- and neither is printed on a
   // receipt, which is what the columns on `schools` are for.
   const supabase = await createClient();
-  const { data: settings } = await supabase
-    .from("school_settings")
-    .select("key, value")
-    .eq("school_id", ctx.activeSchool.id)
-    .in("key", ["gcash_number", "telegram_bot", "portal_require_pin"]);
+  const [{ data: settings }, { data: notifyConfig }] = await Promise.all([
+    supabase
+      .from("school_settings")
+      .select("key, value")
+      .eq("school_id", ctx.activeSchool.id)
+      .in("key", ["gcash_number", "telegram_bot", "portal_require_pin"]),
+    supabase
+      .from("gate_notify_config")
+      .select("enabled")
+      .eq("school_id", ctx.activeSchool.id)
+      .maybeSingle(),
+  ]);
 
   const read = (key: string) => {
     const row = (settings ?? []).find(
@@ -59,6 +66,11 @@ export default async function SettingsPage() {
         gcashNumber={read("gcash_number")}
         telegramBotUsername={read("telegram_bot")}
         requirePin={requirePin}
+        // No row means OFF -- claim_notifications() returns early on `not
+        // found`, so an unconfigured school silently sends nothing.
+        gateNotifyEnabled={
+          Boolean((notifyConfig as { enabled?: boolean } | null)?.enabled)
+        }
       />
     </>
   );

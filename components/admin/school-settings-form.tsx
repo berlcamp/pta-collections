@@ -40,11 +40,13 @@ export function SchoolSettingsForm({
   gcashNumber,
   telegramBotUsername,
   requirePin,
+  gateNotifyEnabled,
 }: {
   school: School;
   gcashNumber: string;
   telegramBotUsername: string;
   requirePin: boolean;
+  gateNotifyEnabled: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -67,6 +69,7 @@ export function SchoolSettingsForm({
       gcash_number: gcashNumber,
       telegram_bot_username: telegramBotUsername,
       portal_require_pin: requirePin,
+      gate_notify_enabled: gateNotifyEnabled,
     },
   });
 
@@ -364,6 +367,38 @@ export function SchoolSettingsForm({
                         Switching this on later costs nothing: no card is
                         reissued, and every card already carries a PIN the
                         office can read out.
+                      </FormDescription>
+                    </div>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="gate_notify_enabled"
+              render={({ field }) => (
+                <FormItem className="rounded-lg border p-4">
+                  <div className="flex items-start gap-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={(v) => field.onChange(v === true)}
+                        className="mt-0.5"
+                      />
+                    </FormControl>
+                    <div className="space-y-1">
+                      <FormLabel>Send gate messages to parents</FormLabel>
+                      <FormDescription>
+                        Message a guardian on Telegram each time their child
+                        passes the school gate. Off, the gate still records
+                        every tap &mdash; attendance is unaffected &mdash; it
+                        simply sends nothing.
+                        <br />
+                        Leave this off until the school has told parents it is
+                        coming. A photograph of a child arriving is not a
+                        notification anyone should receive unannounced.
                       </FormDescription>
                     </div>
                   </div>

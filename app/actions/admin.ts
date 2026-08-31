@@ -164,8 +164,13 @@ export async function saveSchoolSettings(input: unknown): Promise<ActionResult> 
   // The two portal keys live in pta.school_settings, not as columns on
   // pta.schools, so they are split out before the update rather than passed
   // through with the rest.
-  const { gcash_number, telegram_bot_username, portal_require_pin, ...schoolColumns } =
-    parsed.data;
+  const {
+    gcash_number,
+    telegram_bot_username,
+    portal_require_pin,
+    gate_notify_enabled,
+    ...schoolColumns
+  } = parsed.data;
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -218,8 +223,20 @@ export async function saveSchoolSettings(input: unknown): Promise<ActionResult> 
     if (upError) return { ok: false, error: upError.message };
   }
 
+  // Gate notifications: a different table, because it also carries the
+  // staleness thresholds. Upserting only `enabled` leaves those alone on an
+  // existing row and takes 0013's defaults on a new one.
+  const { error: notifyError } = await supabase
+    .from("gate_notify_config")
+    .upsert(
+      { school_id: ctx.activeSchool.id, enabled: gate_notify_enabled },
+      { onConflict: "school_id" },
+    );
+  if (notifyError) return { ok: false, error: notifyError.message };
+
   revalidatePath("/admin/settings");
   revalidatePath("/portal", "layout");
+  revalidatePath("/super/schools");
   revalidatePath("/", "layout");
   return { ok: true, data: undefined };
 }
