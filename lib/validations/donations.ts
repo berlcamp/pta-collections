@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dbId } from "@/lib/validations/id";
 
 /**
  * Donation input schemas.
@@ -11,8 +12,8 @@ import { z } from "zod";
  */
 
 export const programSchema = z.object({
-  id: z.uuid().optional(),
-  schoolYearId: z.uuid(),
+  id: dbId().optional(),
+  schoolYearId: dbId(),
   name: z.string().trim().min(3, "Give the program a name.").max(150),
   description: z.string().trim().max(1000).optional().nullable(),
   category: z.enum(["program", "activity", "project", "fund", "other"]),
@@ -40,8 +41,8 @@ export const donorInputSchema = z.object({
     "organization",
     "other",
   ]),
-  guardian_id: z.uuid().nullable().optional(),
-  student_id: z.uuid().nullable().optional(),
+  guardian_id: dbId().nullable().optional(),
+  student_id: dbId().nullable().optional(),
   contact_number: z.string().trim().max(40).nullable().optional(),
   email: z.string().trim().max(160).nullable().optional(),
   address: z.string().trim().max(300).nullable().optional(),
@@ -49,7 +50,7 @@ export const donorInputSchema = z.object({
 
 export const donationSchema = z
   .object({
-    schoolYearId: z.uuid(),
+    schoolYearId: dbId(),
     programId: z.uuid("Choose the program this donation is for."),
     kind: z.enum(["cash", "in_kind"]),
     amount: z.number().positive("Enter an amount greater than zero."),
@@ -57,10 +58,10 @@ export const donationSchema = z
       .enum(["cash", "gcash", "bank_transfer", "other"])
       .nullable(),
     itemDescription: z.string().trim().max(500).nullable(),
-    donorId: z.uuid().nullable(),
+    donorId: dbId().nullable(),
     donor: donorInputSchema.nullable(),
     isAnonymous: z.boolean(),
-    pledgeId: z.uuid().nullable(),
+    pledgeId: dbId().nullable(),
     referenceNumber: z.string().trim().max(120).nullable(),
     remarks: z.string().trim().max(500).nullable(),
     idempotencyKey: z.string().min(1).max(120).nullable(),
@@ -91,10 +92,10 @@ export const donationSchema = z
   });
 
 export const pledgeSchema = z.object({
-  schoolYearId: z.uuid(),
+  schoolYearId: dbId(),
   programId: z.uuid("Choose the program being pledged to."),
   amount: z.number().positive("Enter an amount greater than zero."),
-  donorId: z.uuid().nullable(),
+  donorId: dbId().nullable(),
   donor: donorInputSchema.nullable(),
   dueDate: z.string().nullable(),
   notes: z.string().trim().max(500).nullable(),
@@ -104,17 +105,17 @@ export const pledgeSchema = z.object({
 });
 
 export const voidDonationSchema = z.object({
-  donationId: z.uuid(),
+  donationId: dbId(),
   reason: z.string().trim().min(3, "A reason is required."),
 });
 
 export const cancelPledgeSchema = z.object({
-  pledgeId: z.uuid(),
+  pledgeId: dbId(),
   reason: z.string().trim().min(3, "A reason is required."),
 });
 
 export const donorSchema = z.object({
-  id: z.uuid(),
+  id: dbId(),
   display_name: z.string().trim().min(2, "Enter the donor's name.").max(150),
   donor_type: donorInputSchema.shape.donor_type,
   contact_number: z.string().trim().max(40).nullable(),

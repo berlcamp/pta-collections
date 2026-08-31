@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getSessionContext } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "./types";
+import { dbId } from "@/lib/validations/id";
 
 /**
  * The claims review queue.
@@ -34,7 +35,7 @@ export async function approveClaim(
 ): Promise<ActionResult<{ receiptNumber?: string }>> {
   await requireReviewer();
 
-  const parsed = z.uuid().safeParse(claimId);
+  const parsed = dbId().safeParse(claimId);
   if (!parsed.success) return { ok: false, error: "Unknown claim." };
 
   const supabase = await createClient();
@@ -52,7 +53,7 @@ export async function approveClaim(
 }
 
 const rejectSchema = z.object({
-  claimId: z.uuid(),
+  claimId: dbId(),
   reason: z
     .string()
     .trim()

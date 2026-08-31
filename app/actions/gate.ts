@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireSuperAdmin } from "@/lib/auth/session";
 import type { ActionResult } from "./types";
+import { dbId } from "@/lib/validations/id";
 
 /**
  * Gate card enrolment.
@@ -60,7 +61,7 @@ export async function assignCard(input: unknown): Promise<ActionResult> {
 export async function revokeCard(cardId: unknown): Promise<ActionResult> {
   await requireSuperAdmin();
 
-  const parsed = z.uuid().safeParse(cardId);
+  const parsed = dbId().safeParse(cardId);
   if (!parsed.success) return { ok: false, error: "Unknown card." };
 
   const supabase = await createClient();

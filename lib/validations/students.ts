@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dbId } from "@/lib/validations/id";
 
 /**
  * A student carries exactly ONE parent/guardian — the collection contact the
@@ -14,7 +15,7 @@ import { z } from "zod";
 const guardianSchema = z
   .object({
     /** Set when an existing guardian was picked; the typed fields then mirror it. */
-    guardian_id: z.uuid().nullish(),
+    guardian_id: dbId().nullish(),
     first_name: z.string().trim(),
     last_name: z.string().trim(),
     contact_number: z.string().trim().max(40).optional(),
@@ -55,7 +56,7 @@ const guardianSchema = z
   });
 
 export const newStudentSchema = z.object({
-  schoolYearId: z.uuid(),
+  schoolYearId: dbId(),
   lrn: z
     .string()
     .trim()
@@ -69,7 +70,7 @@ export const newStudentSchema = z.object({
   birth_date: z.string().optional(),
   sex: z.enum(["M", "F"]).optional(),
   grade_level: z.string().min(1, "Choose a grade level."),
-  section_id: z.uuid().optional().nullable(),
+  section_id: dbId().optional().nullable(),
   student_number: z.string().trim().max(40).optional(),
   guardian: guardianSchema,
 });

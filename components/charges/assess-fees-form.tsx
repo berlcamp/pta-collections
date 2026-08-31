@@ -47,10 +47,11 @@ import {
 import { formatMoney } from "@/lib/financial/money";
 import { assessAnnualFees } from "@/app/actions/charges";
 import type { FeeType, SchoolYear } from "@/types/database.types";
+import { dbId } from "@/lib/validations/id";
 
 const formSchema = z.object({
-  schoolYearId: z.uuid(),
-  feeTypeIds: z.array(z.uuid()).min(1, "Select at least one fee type."),
+  schoolYearId: dbId(),
+  feeTypeIds: z.array(dbId()).min(1, "Select at least one fee type."),
   dueDate: z.string(),
 });
 

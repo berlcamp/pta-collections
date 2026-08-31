@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dbId } from "@/lib/validations/id";
 
 export const paymentMethodSchema = z.enum([
   "cash",
@@ -8,14 +9,14 @@ export const paymentMethodSchema = z.enum([
 ]);
 
 export const paymentLineSchema = z.object({
-  charge_id: z.uuid(),
+  charge_id: dbId(),
   amount: z.number().positive("Each line must be greater than zero."),
 });
 
 export const createPaymentSchema = z
   .object({
-    studentId: z.uuid(),
-    schoolYearId: z.uuid(),
+    studentId: dbId(),
+    schoolYearId: dbId(),
     paymentMethod: paymentMethodSchema,
     items: z.array(paymentLineSchema).min(1, "Select at least one charge to pay."),
     referenceNumber: z.string().trim().max(64).optional().nullable(),
@@ -40,7 +41,7 @@ export const createPaymentSchema = z
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
 
 export const voidPaymentSchema = z.object({
-  paymentId: z.uuid(),
+  paymentId: dbId(),
   reason: z
     .string()
     .trim()

@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { dbId } from "@/lib/validations/id";
 
 export const schoolYearSchema = z.object({
-  id: z.uuid().optional(),
+  id: dbId().optional(),
   name: z
     .string()
     .trim()
@@ -12,8 +13,8 @@ export const schoolYearSchema = z.object({
 });
 
 export const sectionSchema = z.object({
-  id: z.uuid().optional(),
-  school_year_id: z.uuid(),
+  id: dbId().optional(),
+  school_year_id: dbId(),
   grade_level: z.string().min(1, "Choose a grade level."),
   name: z.string().trim().min(1, "Give the section a name.").max(60),
 });
@@ -25,7 +26,7 @@ export const inviteSchema = z.object({
 });
 
 export const membershipStatusSchema = z.object({
-  schoolUserId: z.uuid(),
+  schoolUserId: dbId(),
   status: z.enum(["active", "inactive"]),
 });
 

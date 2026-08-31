@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { dbId } from "@/lib/validations/id";
 
 export const feeTypeSchema = z.object({
-  id: z.uuid().optional(),
+  id: dbId().optional(),
   name: z.string().trim().min(2, "Give the fee a name.").max(120),
   description: z.string().trim().max(500).optional().nullable(),
   category: z.enum(["annual", "penalty", "special", "other"]),
@@ -15,15 +16,15 @@ export const feeTypeSchema = z.object({
 });
 
 export const assessSchema = z.object({
-  schoolYearId: z.uuid(),
-  feeTypeIds: z.array(z.uuid()).min(1, "Select at least one fee type."),
-  studentIds: z.array(z.uuid()).nullable(),
+  schoolYearId: dbId(),
+  feeTypeIds: z.array(dbId()).min(1, "Select at least one fee type."),
+  studentIds: z.array(dbId()).nullable(),
   dueDate: z.string().nullable(),
 });
 
 export const penaltySchema = z.object({
-  studentId: z.uuid(),
-  schoolYearId: z.uuid(),
+  studentId: dbId(),
+  schoolYearId: dbId(),
   feeTypeId: z.uuid("Choose a penalty type."),
   amount: z.number().positive("The amount must be greater than zero."),
   description: z
@@ -34,12 +35,12 @@ export const penaltySchema = z.object({
 });
 
 export const waiveSchema = z.object({
-  chargeId: z.uuid(),
+  chargeId: dbId(),
   amount: z.number().positive("The waived amount must be greater than zero."),
   reason: z.string().trim().min(3, "A reason is required."),
 });
 
 export const cancelChargeSchema = z.object({
-  chargeId: z.uuid(),
+  chargeId: dbId(),
   reason: z.string().trim().min(3, "A reason is required."),
 });

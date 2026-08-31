@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getSessionContext } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "./types";
+import { dbId } from "@/lib/validations/id";
 
 /**
  * Parent card issuance — the staff side of the portal.
@@ -41,7 +42,7 @@ export async function issueParentCard(
 ): Promise<ActionResult<{ cardNumber: string; pin: string; accountId: string }>> {
   await requireCardIssuer();
 
-  const parsed = z.uuid().safeParse(guardianId);
+  const parsed = dbId().safeParse(guardianId);
   if (!parsed.success) return { ok: false, error: "Unknown guardian." };
 
   const supabase = await createClient();
@@ -72,7 +73,7 @@ export async function issueParentCard(
 }
 
 const revokeSchema = z.object({
-  accountId: z.uuid(),
+  accountId: dbId(),
   reason: z.string().trim().min(3, "Say why — it goes in the audit log."),
 });
 
@@ -113,7 +114,7 @@ export async function resetParentPin(
 ): Promise<ActionResult<{ pin: string }>> {
   await requireCardIssuer();
 
-  const parsed = z.uuid().safeParse(accountId);
+  const parsed = dbId().safeParse(accountId);
   if (!parsed.success) return { ok: false, error: "Unknown card." };
 
   const supabase = await createClient();

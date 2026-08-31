@@ -10,6 +10,7 @@ import {
 } from "@/lib/portal/session";
 import { createPortalClient } from "@/lib/portal/supabase";
 import type { ActionResult } from "./types";
+import { dbId } from "@/lib/validations/id";
 
 /**
  * The parent's write verbs.
@@ -24,10 +25,10 @@ import type { ActionResult } from "./types";
 const claimSchema = z
   .object({
     claimType: z.enum(["fee", "donation"]),
-    studentId: z.uuid().optional().nullable(),
-    programId: z.uuid().optional().nullable(),
+    studentId: dbId().optional().nullable(),
+    programId: dbId().optional().nullable(),
     items: z
-      .array(z.object({ charge_id: z.uuid(), amount: z.number().positive() }))
+      .array(z.object({ charge_id: dbId(), amount: z.number().positive() }))
       .optional()
       .nullable(),
     amount: z.number().positive("Enter the amount you sent."),
