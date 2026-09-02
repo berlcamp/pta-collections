@@ -57,7 +57,7 @@ export default async function NoAccessPage() {
         <CardDescription>
           {provisioned
             ? "This account is not currently assigned to any school."
-            : "This account has not been invited to any school in the PTA Collection System."}
+            : "This account has not been invited to any school on Smart Campus."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

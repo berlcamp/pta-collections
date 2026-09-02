@@ -152,7 +152,13 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // The metadata routes are excluded BY NAME because they carry no file
+  // extension: /robots.txt and /sitemap.xml aside, Next serves the generated
+  // icon and Open Graph images from extensionless paths like /opengraph-image.
+  // Without this, the gate below answered every one of them with a 307 to
+  // /login — so Facebook, Messenger, Viber and Slack fetched a redirect
+  // instead of a thumbnail, and crawlers were told the site had no robots.txt.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|opengraph-image|twitter-image|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

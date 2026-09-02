@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap, IdCard } from "lucide-react";
+import { IdCard, Nfc } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { DevLoginForm } from "@/components/auth/dev-login-form";
@@ -25,9 +25,9 @@ export default async function LoginPage({
     <Card className="w-full shadow-xl">
       <CardHeader className="items-center gap-2 text-center">
         <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-          <GraduationCap className="size-7" />
+          <Nfc className="size-7" />
         </div>
-        <CardTitle className="text-xl">PTA Collection System</CardTitle>
+        <CardTitle className="text-xl">Smart Campus</CardTitle>
         <CardDescription className="text-pretty">
           Sign in with the Google account your school administrator invited.
         </CardDescription>

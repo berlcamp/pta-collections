@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { GraduationCap, IdCard } from "lucide-react";
+import { IdCard, Nfc } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const SECTIONS = [
-  { href: "#modules", label: "Modules" },
-  { href: "#how", label: "How it works" },
-  { href: "#parents", label: "For parents" },
+  { href: "#gate", label: "Gate attendance" },
+  { href: "#parents", label: "Parent portal" },
+  { href: "#collections", label: "Collections" },
   { href: "#roles", label: "Roles" },
   { href: "#trust", label: "Controls" },
 ] as const;
@@ -26,12 +26,14 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-5 sm:px-8">
         <Link href="/" className="flex items-center gap-2.5">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            <GraduationCap className="size-5" />
+            {/* The contactless arcs, not a mortarboard: what this product does at a
+                school is read a card at the gate. */}
+            <Nfc className="size-5" />
           </span>
           <span className="text-sm leading-tight font-semibold tracking-tight">
-            PTA Collection
+            Smart Campus
             <span className="block text-xs font-normal text-sidebar-foreground/55">
-              Philippine schools
+              by KeriTech
             </span>
           </span>
         </Link>
@@ -52,21 +54,20 @@ export function SiteHeader() {
           <div className="text-sidebar-foreground/80 [&_button:hover]:bg-sidebar-accent [&_button:hover]:text-sidebar-accent-foreground">
             <ThemeToggle />
           </div>
-          {/* Two doors, and the parent one comes first because there are a
-              few hundred parents to every handful of staff. It is the ghost
-              button so the school-facing CTA still reads as primary — the
-              school is who chooses this software, the parents are who use it.
-              The label shortens on small screens so both fit beside the logo. */}
+          {/* Two doors, and the parent one is the primary button: the page it
+              sits on leads with the gate alerts and the portal, and there are
+              a few hundred parents to every handful of staff. Staff still get
+              a door of their own, one step quieter. The labels shorten on
+              small screens so both fit beside the logo. */}
           <Button
             asChild
             size="sm"
             variant="ghost"
             className="border border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground dark:hover:bg-sidebar-accent"
           >
-            <Link href="/portal/login">
-              <IdCard className="size-4" />
-              <span className="hidden sm:inline">Parent sign in</span>
-              <span className="sm:hidden">Parents</span>
+            <Link href="/login">
+              <span className="hidden sm:inline">School sign in</span>
+              <span className="sm:hidden">School</span>
             </Link>
           </Button>
           <Button
@@ -74,9 +75,10 @@ export function SiteHeader() {
             size="sm"
             className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/85"
           >
-            <Link href="/login">
-              <span className="hidden sm:inline">School sign in</span>
-              <span className="sm:hidden">School</span>
+            <Link href="/portal/login">
+              <IdCard className="size-4" />
+              <span className="hidden sm:inline">Parent sign in</span>
+              <span className="sm:hidden">Parents</span>
             </Link>
           </Button>
         </div>

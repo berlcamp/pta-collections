@@ -1,8 +1,9 @@
-# PTA Collection Management System
+# Smart Campus — by KeriTech
 
-Multi-tenant PTA dues, penalties, collections, receipts and financial reporting
-for Philippine schools. **A school is a tenant**; data is isolated at the
-database level by PostgreSQL Row Level Security, not by application code.
+Gate attendance with Telegram alerts, a parent/guardian portal, and multi-tenant
+PTA dues, penalties, collections, receipts and financial reporting for Philippine
+schools. **A school is a tenant**; data is isolated at the database level by
+PostgreSQL Row Level Security, not by application code.
 
 Next.js 16 · React 19 · TypeScript (strict) · Supabase (schema `pta`) · Tailwind 4 · shadcn/ui
 
@@ -40,6 +41,13 @@ map for your other Supabase projects, and troubleshooting.
 **Manual step the code cannot do for itself:** add `pta` to
 *Supabase → Settings → API → Exposed schemas*, or PostgREST returns 404 for
 every table.
+
+**Set `NEXT_PUBLIC_SITE_URL` in production** (`.env` is gitignored, so it is not
+in `.env.example` either). It backs `metadataBase`, `robots.txt` and the
+sitemap, and it is what makes the Open Graph image URL absolute — a relative
+`og:image` is dropped by Facebook, Messenger, Viber and Slack rather than
+resolved against the page. On Vercel the project's production domain is used
+when it is unset.
 
 Apply `supabase/migrations/*.sql` in numeric order via the SQL Editor. The last
 one seeds `berlcamp@gmail.com` as Super Admin; sign in with that Google account

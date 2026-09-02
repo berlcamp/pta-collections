@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { GraduationCap } from "lucide-react";
+import { Nfc } from "lucide-react";
 
 import { PortalLoginForm } from "@/components/portal/login-form";
 import { LocaleSwitch } from "@/components/portal/locale-switch";
@@ -51,7 +51,7 @@ export default async function PortalLoginPage({
         <Card className="shadow-lg">
           <CardHeader className="items-center gap-2 text-center">
             <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-              <GraduationCap className="size-7" />
+              <Nfc className="size-7" />
             </div>
             <CardTitle className="text-xl">{copy.signInTitle}</CardTitle>
             <CardDescription className="text-pretty">

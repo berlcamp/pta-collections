@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap } from "lucide-react";
+import { Nfc } from "lucide-react";
 
 export function SiteFooter() {
   return (
@@ -12,15 +12,15 @@ export function SiteFooter() {
         <div>
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-              <GraduationCap className="size-5" />
+              <Nfc className="size-5" />
             </span>
             <span className="text-sm font-semibold tracking-tight">
-              PTA Collection System
+              Smart Campus
             </span>
           </div>
           <p className="mt-4 max-w-xs text-sm text-pretty text-sidebar-foreground/60">
-            Dues, penalties, receipts and reporting for Philippine parent-teacher
-            associations. One school, one ledger.
+            Gate attendance with Telegram alerts, a portal for parents, and the
+            PTA ledger behind both. One school, one record.
           </p>
         </div>
 
@@ -30,8 +30,10 @@ export function SiteFooter() {
           </p>
           <ul className="mt-3 space-y-2 text-sidebar-foreground/70">
             {[
+              { href: "#gate", label: "Gate attendance" },
+              { href: "#parents", label: "Parent portal" },
+              { href: "#collections", label: "Collections" },
               { href: "#modules", label: "Modules" },
-              { href: "#how", label: "How it works" },
               { href: "#roles", label: "Roles" },
               { href: "#trust", label: "Controls" },
             ].map((l) => (
@@ -50,14 +52,6 @@ export function SiteFooter() {
           </p>
           <ul className="mt-3 space-y-2 text-sidebar-foreground/70">
             <li>
-              <Link href="/login" className="transition-colors hover:text-sidebar-foreground">
-                School sign in
-              </Link>
-            </li>
-            <li className="text-sidebar-foreground/50">
-              Invitation only &mdash; ask your school administrator.
-            </li>
-            <li className="pt-2">
               <Link
                 href="/portal/login"
                 className="transition-colors hover:text-sidebar-foreground"
@@ -68,13 +62,21 @@ export function SiteFooter() {
             <li className="text-sidebar-foreground/50">
               Use the number on your PTA parent card.
             </li>
+            <li className="pt-2">
+              <Link href="/login" className="transition-colors hover:text-sidebar-foreground">
+                School sign in
+              </Link>
+            </li>
+            <li className="text-sidebar-foreground/50">
+              Invitation only &mdash; ask your school administrator.
+            </li>
           </ul>
         </nav>
       </div>
 
       <div className="relative border-t border-sidebar-border/70">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-5 font-mono text-xs text-sidebar-foreground/45 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <p>&copy; {new Date().getFullYear()} PTA Collection System</p>
+          <p>&copy; {new Date().getFullYear()} Smart Campus by KeriTech</p>
           <p>Figures shown on this page are illustrative.</p>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GraduationCap } from "lucide-react";
+import { Nfc } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { dynamicRoute } from "@/lib/routes";
@@ -48,7 +48,7 @@ export function AppSidebar({
       <SidebarHeader className="border-b border-sidebar-border p-0">
         <div className="flex h-16 items-center gap-3 px-3">
           <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            <GraduationCap className="size-5" />
+            <Nfc className="size-5" />
           </div>
           <Link
             href="/dashboard"
@@ -56,7 +56,7 @@ export function AppSidebar({
             className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"
           >
             <span className="block truncate text-sm font-semibold text-sidebar-foreground">
-              PTA Collection
+              Smart Campus
             </span>
             <span className="block truncate text-xs text-sidebar-foreground/60">
               {schoolName ?? "Global administration"}
