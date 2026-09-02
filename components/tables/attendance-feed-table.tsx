@@ -2,7 +2,14 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { CircleHelp, Clock, PackageOpen } from "lucide-react";
+import {
+  BellOff,
+  CircleHelp,
+  Clock,
+  PackageOpen,
+  Send,
+  UserX,
+} from "lucide-react";
 
 import { DataTable, SortableHeader } from "@/components/common/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +31,15 @@ import { dynamicRoute } from "@/lib/routes";
  * an outage, and `clock_synced = false` means the timestamp was reconstructed
  * from the device's uptime because it had no NTP yet. A board that displayed
  * either as an ordinary arrival time would be quietly making things up.
+ *
+ * The Parent column answers the question the office is actually asked — "does
+ * the mother know he got here?" — and it answers it about DELIVERY, not about
+ * paperwork. `telegram` is true only when the student has a guardian meeting
+ * all three conditions pta.claim_notifications() checks before it sends. A
+ * guardian who is on file, has linked Telegram, and then muted it is a
+ * different state from one who never linked, and they get different badges:
+ * showing "not linked" for a parent who linked last term would send the office
+ * chasing a setup step that is already done.
  */
 export interface AttendanceFeedRow {
   event_id: string;
@@ -37,6 +53,17 @@ export interface AttendanceFeedRow {
   device_id: string;
   queued: boolean;
   clock_synced: boolean;
+  /** Null for an unknown card: there is no student, so there is no question to
+   *  answer. Distinct from a student with nobody on file, which is a finding. */
+  guardian: GuardianCell | null;
+}
+
+export interface GuardianCell {
+  name: string;
+  relationship: string | null;
+  total: number;
+  linked: number;
+  reachable: number;
 }
 
 export function AttendanceFeedTable({
@@ -88,7 +115,9 @@ export function AttendanceFeedTable({
       id: "student",
       accessorFn: (r) => r.student_name ?? "Unknown card",
       meta: { label: "Student" },
-      header: ({ column }) => <SortableHeader column={column} title="Student" />,
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Student" />
+      ),
       cell: ({ row }) =>
         row.original.student_id ? (
           <div className="min-w-0">
@@ -115,6 +144,105 @@ export function AttendanceFeedTable({
               </Link>
             </Button>
           </div>
+        ),
+    },
+    {
+      id: "parent",
+      accessorFn: (r) => r.guardian?.name ?? "",
+      meta: { label: "Parent" },
+      header: ({ column }) => <SortableHeader column={column} title="Parent" />,
+      cell: ({ row }) => {
+        const g = row.original.guardian;
+
+        // No student behind the tap. Nothing is missing — the question does not
+        // apply — so this must not look like a school that failed to record a
+        // parent. The unknown card is already flagged in the Student column.
+        if (!row.original.student_id) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+
+        if (!g) {
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-warning">
+                  <UserX className="size-3.5" />
+                  No parent on file
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                Nobody is linked to this student, so no arrival message can be
+                sent. Add a parent or guardian on the student&apos;s record.
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
+
+        const others = g.total - 1;
+
+        return (
+          <div className="min-w-0">
+            <p className="truncate font-medium">{g.name}</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              {g.reachable > 0 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="border-success/30 bg-success/10 text-success"
+                    >
+                      <Send className="size-3 " />
+                      Telegram
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {g.reachable === 1
+                      ? "This guardian gets a Telegram message when the card taps."
+                      : `${g.reachable} of this student's guardians get a Telegram message when the card taps.`}
+                  </TooltipContent>
+                </Tooltip>
+              ) : g.linked > 0 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-muted-foreground">
+                      <BellOff className="size-3" />
+                      Muted
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Telegram is linked but alerts are switched off — either the
+                    guardian sent /stop to the bot, or notifications are off on
+                    their link to this student. Nothing is sent.
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-muted-foreground">
+                      <BellOff className="size-3" />
+                      Not linked
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    No Telegram yet, so this tap sends nothing. The parent links
+                    it themselves from the portal, in one tap.
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              <span className="truncate text-xs text-muted-foreground">
+                {[g.relationship, others > 0 ? `+${others} more` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </div>
+          </div>
+        );
+      },
+      sortingFn: (a, b) =>
+        (b.original.guardian?.reachable ?? -1) -
+          (a.original.guardian?.reachable ?? -1) ||
+        (a.original.guardian?.name ?? "").localeCompare(
+          b.original.guardian?.name ?? "",
         ),
     },
     {
@@ -145,7 +273,7 @@ export function AttendanceFeedTable({
       columns={columns}
       data={rows}
       pageSize={pageSize}
-      searchPlaceholder="Search name, card or reader…"
+      searchPlaceholder="Search student, parent, card or reader…"
       initialSorting={[{ id: "time", desc: true }]}
     />
   );

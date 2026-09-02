@@ -2,7 +2,7 @@ import { CircleHelp, GraduationCap, Radio, ScanLine, UserCheck } from "lucide-re
 
 import { requireSuperAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { resolveGateSchool } from "@/lib/data/gate";
+import { getGuardianNotices, resolveGateSchool } from "@/lib/data/gate";
 import { todayInTimezone } from "@/lib/utils/dates";
 import { PageHeader, SectionHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
@@ -145,6 +145,13 @@ export default async function GateMonitorPage({
       hour12: false,
     }).format(new Date(iso));
 
+  // A second round trip, because the ids to ask about only exist once the feed
+  // has come back. Scoped to the students on screen — see getGuardianNotices.
+  const notices = await getGuardianNotices(
+    school.id,
+    feed.map((s) => s.student_id).filter((id): id is string => id !== null),
+  );
+
   const feedRows: AttendanceFeedRow[] = feed.map((s) => ({
     event_id: s.event_id,
     time: time(s.scanned_at),
@@ -157,6 +164,7 @@ export default async function GateMonitorPage({
     device_id: s.device_id,
     queued: s.queued,
     clock_synced: s.clock_synced,
+    guardian: s.student_id ? (notices.get(s.student_id) ?? null) : null,
   }));
 
   const rosterRows: RosterStatusRow[] = roster.map((r) => {
@@ -247,7 +255,7 @@ export default async function GateMonitorPage({
       <div className="mt-8">
         <SectionHeader
           title="Recent scans"
-          description={`Newest first, latest ${FEED_LIMIT}. A row is a card passing the reader — not a presence claim.`}
+          description={`Newest first, latest ${FEED_LIMIT}. A row is a card passing the reader — not a presence claim. The Parent column says whether that tap actually reached anyone on Telegram.`}
         />
         {feedRows.length === 0 ? (
           <EmptyState
