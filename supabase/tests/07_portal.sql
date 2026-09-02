@@ -180,6 +180,12 @@ select pta_test.eq(length(pta.generate_pin()), 6,
 -- ---------------------------------------------------------------------------
 select pta_test.login(:A_ADMIN::uuid);
 
+-- The queue the "Awaiting a card" list is built from: a guardian with a child
+-- on file and no card yet. Two of them at School A — Ana and Ben. (Rosa, from
+-- 05_donations, is a donor with no child on file and is covered at PP17g.)
+select pta_test.eq((select count(*) from pta.v_parent_cards_pending)::int, 2,
+  'PP8b. A guardian with a child and no card is awaiting one');
+
 create temp table _cards (who text, card text, pin text, account uuid);
 
 insert into _cards
@@ -242,6 +248,12 @@ select pta_test.throws($$
 $$, 'PP16. Another school''s admin cannot issue a card to your guardian');
 select pta_test.eq((select count(*) from pta.v_parent_cards_detail)::int, 0,
   'PP17. School B sees none of School A''s parent cards');
+-- 0020 made v_parent_cards_pending a DEFINER view, so RLS on
+-- parents_guardians no longer scopes it and the compiled-in
+-- current_school_ids() filter is the only thing standing here. Carla is School
+-- B's own guardian; Ana, Ben and Rosa must not appear.
+select pta_test.eq((select count(*) from pta.v_parent_cards_pending)::int, 1,
+  'PP17a. School B sees only its OWN guardians awaiting a card');
 select pta_test.logout();
 
 -- ---------------------------------------------------------------------------
@@ -262,11 +274,69 @@ select pta_test.eq((select count(*) from pta.portal_accounts)::int, 0,
   'PP17c. Neither does an admin — the table has no read policy at all');
 select pta_test.eq((select count(*) from pta.v_parent_cards_detail)::int, 2,
   'PP17d. ...they see their school''s cards through the masking view instead');
+
+-- The regression 0020 fixes. v_parent_cards_pending used to be an INVOKER view
+-- consulting portal_accounts — the table PP17c just proved reads as empty for
+-- everybody — so `not exists` was a constant TRUE and an issued guardian never
+-- left the queue. Before the fix this count was still 2.
+select pta_test.eq((select count(*) from pta.v_parent_cards_pending)::int, 0,
+  'PP17m. Issuing a card REMOVES the guardian from "awaiting a card"');
+
+-- Rosa (05_donations) is a donor with no child on file, and never appeared in
+-- that queue at all: a parent card shows a guardian their children, so one
+-- would show her nothing.
+select pta_test.ok(
+  not exists (select 1 from pta.v_parent_cards_pending p
+               join pta.parents_guardians g on g.id = p.guardian_id
+              where g.first_name = 'Rosa'),
+  'PP17n. A guardian with no child on file is not awaiting a card at all');
 select pta_test.logout();
 
 select pta_test.login(:SUPER::uuid);
 select pta_test.eq((select count(*) from pta.portal_accounts)::int, 0,
   'PP17e. Not even a super admin reads the raw credential table');
+select pta_test.logout();
+
+-- ---------------------------------------------------------------------------
+-- Reading a card number back (0020)
+--
+-- The number is still masked in every list and still shown once at issuance.
+-- reveal_parent_card() is the one door, it is super-admin-only, and it exists
+-- so that a slip lost between the office and the parent costs a reprint rather
+-- than a revoke-and-reissue that locks the family out of a card they still hold.
+-- ---------------------------------------------------------------------------
+select pta_test.login(:A_ADMIN::uuid);
+select pta_test.throws($$
+  select pta.reveal_parent_card(
+    (select account from _cards where who = 'ana'))
+$$, 'PP17o. An admin may ISSUE a card but may not read one back');
+select pta_test.logout();
+
+select pta_test.login(:A_CASHIER::uuid);
+select pta_test.throws($$
+  select pta.reveal_parent_card(
+    (select account from _cards where who = 'ana'))
+$$, 'PP17p. Least of all a cashier, who scans these numbers all day');
+select pta_test.logout();
+
+select pta_test.login(:SUPER::uuid);
+select pta_test.eq(
+  (select pta.reveal_parent_card(
+     (select account from _cards where who = 'ana')) ->> 'card_number'),
+  (select card from _cards where who = 'ana'),
+  'PP17q. A super admin gets the real number back, so the card can be reprinted');
+
+-- Same rule as issuance (PP14): the number must not reach audit_logs, which
+-- every admin and treasurer at the school can read.
+select pta_test.ok(
+  not exists (select 1 from pta.audit_logs
+               where action = 'PORTAL_CARD_REVEALED'
+                 and new_values::text like '%' ||
+                     (select left(card, 8) from _cards where who = 'ana') || '%'),
+  'PP17r. The reveal is audited by last4 — the audit row never carries the number');
+select pta_test.ok(
+  exists (select 1 from pta.audit_logs where action = 'PORTAL_CARD_REVEALED'),
+  'PP17s. ...but it IS audited: reading a credential is an event, not a lookup');
 select pta_test.logout();
 
 -- ---------------------------------------------------------------------------
@@ -1155,6 +1225,15 @@ select pta_test.logout();
 select pta_test.eq(
   (select pta.portal_login(card, '135790', '10.0.0.1') ->> 'reason' from _cards where who='ana'),
   'invalid', 'PP118. A revoked card cannot log in again');
+
+-- Nor can it be reprinted. A revoked number has no legitimate second life, so
+-- reveal_parent_card() refuses it rather than handing back a dead credential
+-- somebody might hand to a parent (0020).
+select pta_test.login(:SUPER::uuid);
+select pta_test.throws($$
+  select pta.reveal_parent_card((select account from _cards where who = 'ana'))
+$$, 'PP118b. A revoked card cannot be revealed either — the answer is a new one');
+select pta_test.logout();
 
 select pta_test.login(:A_ADMIN::uuid);
 select pta_test.throws($$

@@ -21,10 +21,20 @@ import { dbId } from "@/lib/validations/id";
  * off the POS scanner — see reset_parent_pin() in 0016 for why that matters.
  */
 
+/**
+ * Admin, treasurer — or a super admin, who reaches these verbs from
+ * /super/parent-cards and so has no activeRole to check (D2: arriving at /super
+ * means no active school). SQL takes the same view: require_school_role() in
+ * 0016 passes a super admin for any active school, and the audit row records
+ * who it actually was either way.
+ */
 async function requireCardIssuer(): Promise<void> {
   const session = await getSessionContext();
-  const role = session?.activeRole;
-  if (!session || (role !== "admin" && role !== "treasurer")) {
+  if (!session) {
+    throw new Error("Only an administrator or treasurer can issue parent cards.");
+  }
+  const role = session.activeRole;
+  if (!session.isSuperAdmin && role !== "admin" && role !== "treasurer") {
     throw new Error("Only an administrator or treasurer can issue parent cards.");
   }
 }
@@ -61,7 +71,7 @@ export async function issueParentCard(
 
   const result = data as { card_number: string; pin: string; account_id: string };
 
-  revalidatePath("/admin/parent-cards");
+  revalidatePath("/super/parent-cards");
   return {
     ok: true,
     data: {
@@ -96,7 +106,7 @@ export async function revokeParentCard(input: unknown): Promise<ActionResult> {
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath("/admin/parent-cards");
+  revalidatePath("/super/parent-cards");
   return { ok: true, data: undefined };
 }
 
@@ -124,6 +134,45 @@ export async function resetParentPin(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath("/admin/parent-cards");
+  revalidatePath("/super/parent-cards");
   return { ok: true, data: { pin: (data as { pin: string }).pin } };
+}
+
+/**
+ * Read a card number back. SUPER ADMIN ONLY.
+ *
+ * 0016 made the number unrecoverable on purpose, and that stands for everyone
+ * else: an admin and a treasurer may ISSUE a card and still cannot read one
+ * back, because issuing mints a fresh secret while revealing copies one already
+ * in a parent's hands. What was missing was a reprint — a slip lost between the
+ * office and the parent used to cost a revoke-and-reissue, locking the family
+ * out of a card they were still holding.
+ *
+ * The authorization that counts is pta.is_super_admin() inside
+ * reveal_parent_card() (0020), which also writes the audit row. The check here
+ * only saves a round trip and gives a better message than a raised exception.
+ */
+export async function revealParentCard(
+  accountId: unknown,
+): Promise<ActionResult<{ cardNumber: string; guardianName: string }>> {
+  const session = await getSessionContext();
+  if (!session?.isSuperAdmin) {
+    return { ok: false, error: "Only a super admin can read a card number back." };
+  }
+
+  const parsed = dbId().safeParse(accountId);
+  if (!parsed.success) return { ok: false, error: "Unknown card." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("reveal_parent_card", {
+    p_account_id: parsed.data,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  const result = data as { card_number: string; guardian_name: string };
+  return {
+    ok: true,
+    data: { cardNumber: result.card_number, guardianName: result.guardian_name },
+  };
 }

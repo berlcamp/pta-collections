@@ -24,6 +24,13 @@ const ACTION_LABELS: Record<string, string> = {
   CARD_ASSIGNED: "Gate card assigned",
   CARD_REVOKED: "Gate card retired",
   PROFILE_BOUND: "Profile linked",
+  PORTAL_CARD_ISSUED: "Parent card issued",
+  PORTAL_CARD_REVOKED: "Parent card revoked",
+  PORTAL_PIN_RESET: "Parent PIN reset",
+  // A super admin read a card number back off the screen (0020). Listed here
+  // because this is the log the school's own admin reads, and being able to
+  // see that it happened is the point of auditing it.
+  PORTAL_CARD_REVEALED: "Parent card number shown",
 };
 
 const PAGE_SIZE = 100;

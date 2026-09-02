@@ -36,6 +36,10 @@ export const CAPABILITIES = {
   // watch a child through the school gate — so cashiers are excluded even
   // though they may take money all day. Reviewing a claim is the same act as
   // taking a payment at the counter, so it carries the same three roles.
+  //
+  // issueParentCard gates no nav row any more: the screen moved to
+  // /super/parent-cards, next to the reader it belongs to. It is the record of
+  // which school roles pta.issue_parent_card() accepts, which is still the two.
   issueParentCard: ["admin", "treasurer"],
   reviewClaims: ["admin", "cashier", "treasurer"],
 } as const satisfies Record<string, readonly SchoolRole[]>;

@@ -74,7 +74,10 @@ export const SCHOOL_NAV: NavGroup[] = [
       { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
       {
         // Add and Import are buttons in this page's header, not nav rows.
-        label: "Students",
+        // "& Parents" because the roll carries the collection contact on the
+        // row: the parent's name is a column and a search term, not something
+        // you open a student to find.
+        label: "Students & Parents",
         href: "/students",
         icon: "GraduationCap",
       },
@@ -144,7 +147,6 @@ export const SCHOOL_NAV: NavGroup[] = [
           { label: "School years", href: "/admin/school-years", icon: "CalendarRange", capability: "manageSchoolYears" },
           { label: "Sections", href: "/admin/sections", icon: "BookUser", capability: "manageSections" },
           { label: "Users", href: "/admin/users", icon: "Users", capability: "manageUsers" },
-          { label: "Parent cards", href: "/admin/parent-cards", icon: "Smartphone", capability: "issueParentCard" },
           { label: "Audit logs", href: "/admin/audit-logs", icon: "ShieldCheck", capability: "viewAuditLogs" },
         ],
       },
@@ -167,16 +169,23 @@ export const SUPER_NAV: NavGroup[] = [
       },
       {
         // The RFID gate. Its own module rather than a tab under Super admin:
-        // nothing here is money, and the two pages are used by different people
-        // at different times — the monitor during the morning rush, enrolment
-        // when a card is handed over. Both are school-scoped by a picker on the
+        // nothing here is money, and the three pages are used by different
+        // people at different times — the monitor during the morning rush,
+        // enrolment when a card is handed over, parent cards when a family
+        // asks to follow along. All three are school-scoped by a picker on the
         // page, because a super admin arrives here without an active school.
+        //
+        // Parent cards sits here rather than under Administration because it
+        // is the parent-facing half of this same reader: the student card on
+        // the enrolment tab is what taps, and the parent card is what lets the
+        // family watch those taps.
         label: "Gate attendance",
         href: "/super/attendance",
         icon: "ScanLine",
         children: [
           { label: "Live monitor", href: "/super/attendance", icon: "Radio" },
           { label: "Card enrolment", href: "/super/cards", icon: "IdCard" },
+          { label: "Parent cards", href: "/super/parent-cards", icon: "Smartphone" },
         ],
       },
     ],

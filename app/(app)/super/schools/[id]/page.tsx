@@ -171,7 +171,7 @@ export default async function SchoolDetailPage({
       label: "Parent cards issued",
       done: (cardsRes.count ?? 0) > 0,
       detail: "A guardian cannot reach the Parent Portal until somebody hands them a card.",
-      href: "/admin/parent-cards",
+      href: `/super/parent-cards?school=${school.id}`,
       hrefLabel: "Issue",
     },
   ];

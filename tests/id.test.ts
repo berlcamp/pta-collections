@@ -6,7 +6,7 @@ import { dbId } from "@/lib/validations/id";
 /**
  * These are REAL primary keys from the production database, and every one of
  * them was rejected by z.uuid() — which is what surfaced as "Unknown guardian."
- * when an administrator pressed Issue on /admin/parent-cards.
+ * when an administrator pressed Issue on /super/parent-cards.
  */
 const REAL_KEYS = [
   // gen_random_uuid(): a proper v4, which both validators accept.

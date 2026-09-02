@@ -15,7 +15,7 @@ import { z } from "zod";
  * Every one of those ids is a legitimate key that Postgres issued, joins on,
  * and enforces foreign keys against. Validating them with a stricter rule than
  * the database's own turns a working row into "Unknown guardian." — which is
- * exactly what /admin/parent-cards did before this existed.
+ * exactly what /super/parent-cards did before this existed.
  *
  * `z.guid()` is Zod's any-version validator, and it matches Postgres exactly.
  * The database is the authority on what one of its own keys looks like.
