@@ -5,6 +5,7 @@ import { can } from "@/lib/auth/permissions";
 import {
   getGradeLevels,
   getSchoolYears,
+  getSections,
   resolveSchoolYear,
 } from "@/lib/data/school";
 import { searchStudents } from "@/lib/data/students";
@@ -13,9 +14,8 @@ import { EmptyState } from "@/components/common/empty-state";
 import { ServerPagination } from "@/components/common/server-pagination";
 import { SchoolYearPicker } from "@/components/common/school-year-picker";
 import { StudentFilters } from "@/components/students/student-filters";
-import { StudentsTable } from "@/components/tables/students-table";
+import { StudentManager } from "@/components/students/student-manager";
 import { Button } from "@/components/ui/button";
-import { formatNameListing } from "@/lib/utils/names";
 import type { StudentStatus } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ export default async function StudentsPage({
   if (!schoolYear) {
     return (
       <>
-        <PageHeader title="Students" />
+        <PageHeader title="Students & Parents" />
         <EmptyState
           icon={GraduationCap}
           title="No school year yet"
@@ -61,7 +61,7 @@ export default async function StudentsPage({
     );
   }
 
-  const [{ rows, total }, gradeLevels] = await Promise.all([
+  const [{ rows, total }, gradeLevels, sections] = await Promise.all([
     searchStudents({
       schoolId: ctx.activeSchool.id,
       schoolYearId: schoolYear.id,
@@ -71,6 +71,10 @@ export default async function StudentsPage({
       pageSize: PAGE_SIZE,
     }),
     getGradeLevels(),
+    // Only loaded for the row editor's section picker, which is admin-only.
+    can(ctx.activeRole, "manageStudents")
+      ? getSections(ctx.activeSchool.id, schoolYear.id)
+      : Promise.resolve([]),
   ]);
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -78,7 +82,7 @@ export default async function StudentsPage({
   return (
     <>
       <PageHeader
-        title="Students"
+        title="Students & Parents"
         description={`${total.toLocaleString()} enrolled · ${schoolYear.name}`}
         actions={
           <>
@@ -115,16 +119,28 @@ export default async function StudentsPage({
         />
       ) : (
         <div className="space-y-4">
-          <StudentsTable
+          <StudentManager
             filters={<StudentFilters gradeLevels={gradeLevels.map((g) => g.code)} />}
+            canManage={can(ctx.activeRole, "manageStudents")}
+            schoolYearId={schoolYear.id}
+            gradeLevels={gradeLevels}
+            sections={sections}
             rows={rows.map((s) => ({
               student_id: s.student_id,
-              name: formatNameListing(s),
+              first_name: s.first_name,
+              middle_name: s.middle_name,
+              last_name: s.last_name,
+              suffix: s.suffix,
+              lrn: s.lrn,
+              birth_date: s.birth_date,
+              sex: s.sex,
               student_number: s.student_number,
               grade_level: s.grade_level,
+              section_id: s.section_id,
               section_name: s.section_name,
               outstanding: Number(s.outstanding),
               student_status: s.student_status as StudentStatus,
+              guardian: s.guardian,
             }))}
           />
           <ServerPagination

@@ -75,7 +75,7 @@ export function StudentFilters({ gradeLevels }: { gradeLevels: string[] }) {
         <Input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Search name, LRN or student number…"
+          placeholder="Search student, parent, LRN or student number…"
           className="pl-9"
           aria-label="Search students"
         />
