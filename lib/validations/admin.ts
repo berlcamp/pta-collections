@@ -12,6 +12,18 @@ export const schoolYearSchema = z.object({
   is_active: z.boolean(),
 });
 
+/**
+ * Rolling the roll forward. `exitGrade` is nullable rather than optional: the
+ * preview screen always resolves and shows a concrete grade before the button
+ * is live, so an explicit null here means "the caller genuinely wants the
+ * database's default", not "the form forgot to send it".
+ */
+export const promotionSchema = z.object({
+  fromYearId: dbId(),
+  toYearId: dbId(),
+  exitGrade: z.string().trim().min(1).nullable(),
+});
+
 export const sectionSchema = z.object({
   id: dbId().optional(),
   school_year_id: dbId(),

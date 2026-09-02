@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarRange, Loader2, Pencil, Plus } from "lucide-react";
+import { CalendarRange, GraduationCap, Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +56,18 @@ export function SchoolYearManager({ years }: { years: SchoolYear[] }) {
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-end gap-2">
+        {/* Creating a year is inert — it enrolls nobody. This is the step that
+            actually populates it, so it lives next to the button that makes
+            the empty year. */}
+        {years.length > 1 && (
+          <Button variant="outline" asChild>
+            <Link href="/admin/school-years/promote">
+              <GraduationCap className="size-4" />
+              Promote students
+            </Link>
+          </Button>
+        )}
         <Button
           onClick={() => {
             setEditing(null);

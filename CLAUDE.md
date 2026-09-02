@@ -63,6 +63,15 @@ tables can carry a composite FK and never point a card at another school's stude
   payments** (D11). Never bucket `scanned_at` by day in the browser.
 - The gate pages are school-scoped by a `?school=` picker, not by the header
   switcher: a super admin arrives at `/super` with no active school (D2).
+- **`/super/parent-cards` is the third tab**, and the reason it sits under Gate
+  attendance rather than Administration is that it is the parent-facing half of
+  the same reader: the student card enrolled on the previous tab is what taps,
+  and the parent card is what lets the family watch those taps. Its RPCs
+  (`issue_parent_card`, `revoke_parent_card`, `reset_parent_pin`) are still
+  gated admin-or-treasurer in SQL; a super admin passes `require_school_role()`
+  for any active school, which is why the TypeScript guard in
+  `app/actions/parent-cards.ts` accepts `isSuperAdmin` — on `/super` there is no
+  `activeRole` to check.
 
 ### Manual dashboard step
 `pta` must be listed in Settings → API → Exposed schemas, or PostgREST returns 404
@@ -125,6 +134,18 @@ project's usual rules, deliberately:
   rows — and a cashier reads card numbers off the POS scanner all day. Staff go
   through `v_parent_cards_detail` (masked, definer); the POS goes through
   `pta.lookup_parent_card()`, which returns children and never the credential.
+  The one door back to a number is `pta.reveal_parent_card()` (`0020`),
+  **super admin only** and audited by last4 — not admin, not treasurer, and
+  never a view column. It exists so a slip lost between the office and the
+  parent costs a reprint instead of a revoke-and-reissue. The PIN has no
+  equivalent and cannot get one: it is only a hash.
+- **Any view that reads `portal_accounts` must be `security_invoker = off`.**
+  A table nobody may read cannot be consulted by an invoker view — the subquery
+  silently finds nothing. `v_parent_cards_pending` was invoker until `0020` and
+  so listed every guardian as "awaiting a card" forever, including ones holding
+  one. Definer means RLS no longer scopes the view either, so
+  `where ... school_id = any (pta.current_school_ids())` goes in by hand, the
+  same way the `v_portal_*` views compile in their guardian filter.
 - **The PIN is OPTIONAL, per school** (`0017_portal_optional_pin.sql`), via the
   `school_settings` key `portal_require_pin`, **defaulting to off**. With it off
   the barcode is a single-factor bearer credential: worn on a lanyard, readable
@@ -216,6 +237,50 @@ Functions, Telegram's `setWebhook`, and `SUPABASE_JWT_SECRET`.
 `telegram_bot` setting only builds the deep link; sending uses that single
 token, so every school shares one bot until `notify-guardian` learns to look a
 token up per school.
+
+### Creating a school year enrolls NOBODY — promotion does
+`0021_student_promotion.sql`. `saveSchoolYear` inserts a `school_years` row and
+flips `is_active`; it touches no student. Enrollment is per
+`(student, school_year)`, so a new year opens empty and, the moment it goes
+active, the roll reads empty, the gate roster is empty, the portal shows
+parents no children, and no payment can be recorded at all. That is the third
+silent failure above, hitting an established school every June rather than a
+new one once.
+
+`/admin/school-years/promote` is the step that fills it. Two functions, split
+on purpose and sharing one CTE shape so the preview cannot disagree with the
+commit it previews:
+
+- **`pta.promotion_plan()` is SECURITY INVOKER**, because a preview is a read
+  and reads are RLS-bound here like every other one. **`promote_students()` is
+  DEFINER** — the one place identity records do NOT follow `createStudent`'s
+  "write it through the RLS client, a partial failure is recoverable by
+  re-editing" rule. Four thousand students half-promoted is not recoverable by
+  hand, so it is one transaction.
+- **The progression rule is `grade_levels.sort_order`, one step.** Nothing else
+  encodes it.
+- **`default_exit_grade()` is deliberately blind to enrollment status.** It is
+  the highest grade the year *taught*, not the highest still enrolled. Reading
+  `status = 'enrolled'` looks more careful and walks a whole school out of the
+  door one grade per click: promotion marks the exit cohort's enrollments
+  `graduated`, so on a second run the grade below becomes the highest still
+  enrolled and graduates too. `08_promotion.sql` PR23a exists because that bug
+  was real.
+- **Idempotent by construction** — `on conflict do nothing` on
+  `unique (student_id, school_year_id)`. Re-running promotes only whoever was
+  missed. Anything that counts "skipped" AFTER the insert counts the rows it
+  just made; that one was real too (PR10).
+- **It carries no section.** Sections are `unique (school_id, school_year_id,
+  grade_level, name)`, so the target year's are different rows and a Grade 7
+  "Rizal" implies no Grade 8 "Rizal". The office assigns them after.
+- **It assesses no fees and touches no charge, payment or balance.** D25 holds:
+  a graduate KEEPS their dues. `v_outstanding_dues` filters on neither status,
+  it exposes `student_status` — so graduating a debtor moves their dues behind
+  the "include inactive" toggle on `/charges/outstanding`, which already counts
+  them. The preview says so before you click.
+- The student number carries forward only when the target year has not already
+  handed it to someone else, because `student_enrollments_number_idx` is not
+  what the `on conflict` covers and a collision would take the whole run down.
 
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through

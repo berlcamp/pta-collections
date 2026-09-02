@@ -7,6 +7,7 @@ import { can } from "@/lib/auth/permissions";
 import {
   inviteSchema,
   membershipStatusSchema,
+  promotionSchema,
   schoolSchema,
   schoolSettingsSchema,
   schoolYearSchema,
@@ -332,4 +333,60 @@ export async function inviteSchoolAdmin(
 
   revalidatePath(`/super/schools/${schoolId}`);
   return { ok: true, data: undefined };
+}
+
+/**
+ * Roll the roll forward — every enrolled student up one grade into the next
+ * school year, and the exit cohort out of the door.
+ *
+ * Unlike `createStudent`, which writes students through the RLS-bound client
+ * because a partial failure there is recoverable by re-editing, this goes
+ * through a SECURITY DEFINER RPC. Four thousand students half-promoted is not
+ * recoverable by hand, so it has to be one transaction.
+ *
+ * The RPC is idempotent — `on conflict do nothing` on
+ * `unique (student_id, school_year_id)` — so a double-submit promotes nobody
+ * twice.
+ */
+export async function promoteStudents(
+  input: unknown,
+): Promise<ActionResult<{ promoted: number; graduated: number; skipped: number }>> {
+  const ctx = await requireSchool();
+  if (!can(ctx.activeRole, "manageSchoolYears")) {
+    return { ok: false, error: "Only an administrator can promote students." };
+  }
+
+  const parsed = promotionSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request." };
+  }
+  const v = parsed.data;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("promote_students", {
+    p_school_id: ctx.activeSchool.id,
+    p_from_year_id: v.fromYearId,
+    p_to_year_id: v.toYearId,
+    p_exit_grade: v.exitGrade,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  const row = Array.isArray(data) ? data[0] : data;
+
+  // Everything downstream reads through the active school year, so the whole
+  // school-scoped surface is stale after this.
+  revalidatePath("/admin/school-years");
+  revalidatePath("/students");
+  revalidatePath("/charges/outstanding");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    data: {
+      promoted: Number(row?.promoted_count ?? 0),
+      graduated: Number(row?.graduated_count ?? 0),
+      skipped: Number(row?.skipped_count ?? 0),
+    },
+  };
 }
