@@ -26,6 +26,13 @@ import { cn } from "@/lib/utils";
  *
  * The interval is a choice, not a constant: 10s during the morning rush, off
  * entirely when someone leaves the page open on a projector all day.
+ *
+ * A BACKGROUNDED TAB POLLS NOTHING. Both screens that use this are ones staff
+ * leave open for hours, and a page re-run is not free — /super/cards re-reads
+ * the whole active roster to count who still has no card. Firing that every ten
+ * seconds at a tab nobody is looking at is pure waste. Coming back to the tab
+ * refreshes immediately rather than waiting out the rest of the interval, so
+ * the saving costs no staleness: a projector is a visible tab and never pauses.
  */
 const INTERVALS = [
   { value: "10", label: "Every 10s" },
@@ -51,13 +58,28 @@ export function LiveRefresh({ defaultSeconds = 15 }: { defaultSeconds?: number }
 
   useEffect(() => {
     if (every <= 0) return;
-    const timer = setInterval(() => {
+
+    const refresh = () =>
       startTransition(() => {
         router.refresh();
         setSince(0);
       });
+
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
     }, every * 1000);
-    return () => clearInterval(timer);
+
+    // Whatever happened while the tab was in the background is shown the moment
+    // it comes forward, instead of after up to another full interval.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [every, router]);
 
   return (

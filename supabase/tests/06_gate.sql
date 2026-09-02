@@ -343,3 +343,125 @@ select pta_test.ok(
 select pta_test.ok(
   not has_function_privilege('anon', 'pta.revoke_student_card(uuid)', 'execute'),
   'GA44. anon cannot retire a card');
+
+-- ---------------------------------------------------------------------------
+-- Clearing the enrolment queue (0023)
+--
+-- Clearing empties a working list. It is not a judgement about the card, it
+-- deletes nothing, and the card comes straight back when it is tapped again --
+-- which is the behaviour the screen promises and therefore the one worth
+-- asserting hardest.
+-- ---------------------------------------------------------------------------
+select pta_test.login(:A_ADMIN::uuid);
+
+select pta.record_attendance($$[
+  {"event_id":"aaaaaaa1-0000-0000-0000-0000000000f1","device_id":"onhs-main-gate",
+   "card_uid":"FEEDFACE","scanned_at":"2026-06-16T00:10:00Z","clock_synced":true}
+]$$::jsonb);
+
+select pta_test.eq(
+  (select count(*) from pta.v_unassigned_cards where card_uid = 'FEEDFACE')::int,
+  1, 'GA45. An unknown card lands on the enrolment queue');
+
+select pta_test.eq(
+  pta.clear_unassigned_cards(
+    (select id from pta.schools where school_code = 'ONHS'), array['FEEDFACE']),
+  1, 'GA46. Clearing a card reports one row cleared');
+
+select pta_test.eq(
+  (select count(*) from pta.v_unassigned_cards where card_uid = 'FEEDFACE')::int,
+  0, 'GA47. A cleared card leaves the list');
+
+-- The whole reason this is a watermark and not a delete.
+select pta_test.eq(
+  (select count(*) from pta.attendance where card_uid = 'FEEDFACE')::int,
+  1, 'GA48. Clearing deletes no attendance at all');
+select pta_test.eq(
+  (select count(*) from pta.v_attendance_local where card_uid = 'FEEDFACE')::int,
+  1, 'GA49. ...so the tap is still on the attendance board');
+
+-- THE point of the feature: scan it again and it is back.
+select pta.record_attendance($$[
+  {"event_id":"aaaaaaa1-0000-0000-0000-0000000000f2","device_id":"onhs-main-gate",
+   "card_uid":"FEEDFACE","scanned_at":"2026-06-16T00:20:00Z","clock_synced":true}
+]$$::jsonb);
+select pta_test.eq(
+  (select count(*) from pta.v_unassigned_cards where card_uid = 'FEEDFACE')::int,
+  1, 'GA50. Tapping a cleared card again puts it straight back on the list');
+select pta_test.eq(
+  (select scan_count from pta.v_unassigned_cards where card_uid = 'FEEDFACE')::int,
+  2, 'GA51. ...carrying both taps, because neither was ever thrown away');
+
+-- And it can be cleared again: the watermark moves, it does not stick.
+select pta_test.eq(
+  pta.clear_unassigned_cards(
+    (select id from pta.schools where school_code = 'ONHS'), array['FEEDFACE']),
+  1, 'GA52. A card that came back can be cleared again');
+select pta_test.eq(
+  (select count(*) from pta.v_unassigned_cards where card_uid = 'FEEDFACE')::int,
+  0, 'GA53. ...and leaves the list a second time');
+select pta_test.eq(
+  (select count(*) from pta.gate_card_clears where card_uid = 'FEEDFACE')::int,
+  1, 'GA54. Clearing twice keeps one watermark, not two');
+
+-- Nothing to clear is not an error.
+select pta_test.eq(
+  pta.clear_unassigned_cards(
+    (select id from pta.schools where school_code = 'ONHS'), array['FEEDFACE']),
+  0, 'GA55. Clearing an already-cleared card is a no-op');
+select pta_test.eq(
+  pta.clear_unassigned_cards(
+    (select id from pta.schools where school_code = 'ONHS'), array['DEADBEEF']),
+  0, 'GA56. A card a student holds is not on the list, and does not raise');
+
+-- A flushed batch stamped BEFORE the clear still arrives AFTER it, and the
+-- operator has to see it: the watermark is compared against received_at.
+select pta.record_attendance($$[
+  {"event_id":"aaaaaaa1-0000-0000-0000-0000000000f3","device_id":"onhs-main-gate",
+   "card_uid":"FEEDFACE","scanned_at":"2026-06-15T22:00:00Z","clock_synced":false,
+   "queued":true}
+]$$::jsonb);
+select pta_test.eq(
+  (select count(*) from pta.v_unassigned_cards where card_uid = 'FEEDFACE')::int,
+  1, 'GA57. A tap flushed after an outage reappears, though it is stamped earlier');
+
+-- Clear the lot, with no list at all.
+select pta_test.ok(
+  pta.clear_unassigned_cards(
+    (select id from pta.schools where school_code = 'ONHS')) > 0,
+  'GA58. Clearing with no list clears the whole queue');
+select pta_test.eq(
+  (select count(*) from pta.v_unassigned_cards)::int,
+  0, 'GA59. ...and the list is then empty');
+-- Five clear calls above; three moved something and two were no-ops.
+select pta_test.eq(
+  (select count(*) from pta.audit_logs where action = 'GATE_QUEUE_CLEARED')::int,
+  3, 'GA60. Every clear that moved something is audited, and the no-ops are not');
+
+select pta_test.logout();
+
+-- ---------------------------------------------------------------------------
+-- Authorization and tenancy for the new verb
+-- ---------------------------------------------------------------------------
+select pta_test.login(:A_CASHIER::uuid);
+select pta_test.throws($$
+  select pta.clear_unassigned_cards(
+    (select id from pta.schools where school_code = 'ONHS'))
+$$, 'GA61. A cashier cannot clear the enrolment queue');
+select pta_test.logout();
+
+select pta_test.login(:B_ADMIN::uuid);
+select pta_test.throws($$
+  select pta.clear_unassigned_cards(
+    (select id from pta.schools where school_code = 'ONHS'))
+$$, 'GA62. Another school''s admin cannot clear your queue');
+select pta_test.eq((select count(*) from pta.gate_card_clears)::int, 0,
+  'GA63. School B sees none of School A''s watermarks');
+select pta_test.logout();
+
+select pta_test.ok(
+  not has_table_privilege('anon', 'pta.gate_card_clears', 'select'),
+  'GA64. anon cannot read the watermarks');
+select pta_test.ok(
+  not has_function_privilege('anon', 'pta.clear_unassigned_cards(uuid, text[])', 'execute'),
+  'GA65. anon cannot clear the enrolment queue');

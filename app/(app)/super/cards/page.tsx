@@ -12,6 +12,8 @@ import {
   type QueueCard,
   type RosterOption,
 } from "@/components/gate/card-enrolment";
+import { ClearQueueButton } from "@/components/gate/clear-queue-button";
+import { LiveRefresh } from "@/components/gate/live-refresh";
 import {
   StudentCardsTable,
   type StudentCardRow,
@@ -148,6 +150,7 @@ export default async function CardEnrolmentPage({
           hint="cards tapped, owned by nobody"
           icon={CreditCard}
           tone={queue.length > 0 ? "warning" : "default"}
+          action={<ClearQueueButton schoolId={school.id} count={queue.length} />}
         />
         <StatCard
           label="Cards in circulation"
@@ -171,13 +174,24 @@ export default async function CardEnrolmentPage({
       </div>
 
       <div className="mt-8">
+        {/* Enrolment is done AT this screen with a reader in the other hand, so
+            the list has to find the card by itself — an operator holding a card
+            against the gate should not have to think about reloading a page to
+            see it. Ten seconds is the shortest interval the monitor offers and
+            about as long as tapping a card and looking up takes. Same component
+            as the live monitor, and for the same reason: polling a
+            force-dynamic page keeps every read inside the RLS-bound client,
+            where Postgres realtime would need a publication change on a
+            database shared with two other apps. */}
         <SectionHeader
           title="Unassigned cards"
-          description="Tap a card on the reader, then pick it here. Newest tap first."
+          description="Tap a card on the reader and it appears here within seconds, newest first. Clear the list whenever it gets noisy — a card that matters comes back the moment it is tapped again."
+          actions={<LiveRefresh defaultSeconds={10} />}
         />
         <CardEnrolment
           queue={queue}
           roster={rosterOptions}
+          schoolId={school.id}
           timezone={school.timezone}
           preselected={cardParam?.toUpperCase()}
         />

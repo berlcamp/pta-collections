@@ -31,6 +31,10 @@ export function StatCard({
   hint,
   icon: Icon,
   tone = "default",
+  /** A single control belonging to this figure — clearing the queue it counts,
+   *  say. It sits opposite the label rather than under the value, so it never
+   *  gets between the number and the hint that qualifies it. */
+  action,
   className,
 }: {
   label: string;
@@ -38,6 +42,7 @@ export function StatCard({
   hint?: React.ReactNode;
   icon?: LucideIcon;
   tone?: keyof typeof TONES;
+  action?: React.ReactNode;
   className?: string;
 }) {
   const t = TONES[tone];
@@ -56,9 +61,12 @@ export function StatCard({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            {label}
-          </p>
+          <div className="flex items-start gap-2">
+            <p className="min-w-0 flex-1 truncate text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {label}
+            </p>
+            {action}
+          </div>
           <p
             className={cn(
               "mt-1 font-mono text-2xl leading-tight font-semibold tabular-nums",

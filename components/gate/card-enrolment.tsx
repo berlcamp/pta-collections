@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, IdCard, Loader2, Search } from "lucide-react";
+import { CreditCard, IdCard, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -16,9 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/common/empty-state";
-import { assignCard } from "@/app/actions/gate";
+import { assignCard, clearUnassignedCards } from "@/app/actions/gate";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils/dates";
 
@@ -33,6 +32,17 @@ import { formatDateTime } from "@/lib/utils/dates";
  * student invented at the gate would have no enrolment row, hence no school
  * year, no section and no student number: invisible in this app and unbillable.
  * Students are created under Students; this screen binds plastic to one.
+ *
+ * There is also no longer a box to TYPE a uid into. A card uid is 4–32
+ * characters of hex read off a Wiegand decoder, and nobody can copy one by eye
+ * without transposing a pair of digits sooner or later. The failure is silent
+ * in the worst way: assign_student_card() happily binds a uid that no card in
+ * the building actually carries, the screen says the card was issued, and the
+ * student then taps every morning and never appears — while the real uid sits
+ * in the queue looking like a stranger's card. The reader is the only thing
+ * that can be trusted to say what a card's uid is, so the only way in is to
+ * tap it. The one exception is the deep link from the live monitor, and that
+ * uid came off a genuine tap too.
  */
 
 export interface QueueCard {
@@ -55,17 +65,18 @@ export interface RosterOption {
 export function CardEnrolment({
   queue,
   roster,
+  schoolId,
   timezone,
   /** Card UID deep-linked from the live monitor's "Assign" action. */
   preselected,
 }: {
   queue: QueueCard[];
   roster: RosterOption[];
+  schoolId: string;
   timezone: string;
   preselected?: string;
 }) {
   const [target, setTarget] = useState<string | null>(preselected ?? null);
-  const [manual, setManual] = useState("");
 
   // A deep link from the monitor should open the dialog on arrival, and again
   // if the operator clicks a different unknown card over there. Adjusted during
@@ -79,29 +90,6 @@ export function CardEnrolment({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-end gap-2">
-        <div className="min-w-0 flex-1 sm:max-w-xs">
-          <Label htmlFor="manual-uid" className="mb-1.5">
-            Card not in the list?
-          </Label>
-          <Input
-            id="manual-uid"
-            value={manual}
-            onChange={(e) => setManual(e.target.value)}
-            placeholder="Type the UID, e.g. 04A2BF19"
-            className="font-mono"
-            spellCheck={false}
-          />
-        </div>
-        <Button
-          variant="outline"
-          disabled={manual.trim().length < 4}
-          onClick={() => setTarget(manual.trim().toUpperCase())}
-        >
-          Assign this UID
-        </Button>
-      </div>
-
       {queue.length === 0 ? (
         <EmptyState
           icon={CreditCard}
@@ -111,12 +99,12 @@ export function CardEnrolment({
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {queue.map((c) => (
-            <li key={c.card_uid}>
+            <li key={c.card_uid} className="group/card relative">
               <button
                 type="button"
                 onClick={() => setTarget(c.card_uid)}
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-xl border bg-card p-3 text-left transition-colors",
+                  "flex w-full items-start gap-3 rounded-xl border bg-card p-3 pr-10 text-left transition-colors",
                   "hover:border-primary/40 hover:bg-muted/50",
                 )}
               >
@@ -136,6 +124,11 @@ export function CardEnrolment({
                   </span>
                 </span>
               </button>
+
+              {/* Nested inside the <li>, never inside the button above it: a
+                  button in a button is invalid HTML and the browser lifts it
+                  out, which puts the control where nobody expects it. */}
+              <RemoveCardButton schoolId={schoolId} cardUid={c.card_uid} />
             </li>
           ))}
         </ul>
@@ -145,13 +138,69 @@ export function CardEnrolment({
         cardUid={target}
         roster={roster}
         onOpenChange={(open) => {
-          if (!open) {
-            setTarget(null);
-            setManual("");
-          }
+          if (!open) setTarget(null);
         }}
       />
     </>
+  );
+}
+
+/**
+ * Take one card off the list.
+ *
+ * Deliberately quiet — an icon that appears on hover and focus — because the
+ * main verb on this screen is enrolment, and an operator hunting for the card
+ * in their hand should not have a row of crosses competing for the click.
+ *
+ * It is not a delete and not a judgement: the taps stay in attendance and the
+ * card returns the next time the reader sees it. See the header of
+ * 0023_gate_queue_clear.sql.
+ */
+function RemoveCardButton({
+  schoolId,
+  cardUid,
+}: {
+  schoolId: string;
+  cardUid: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <button
+      type="button"
+      title={`Remove ${cardUid} from the list`}
+      aria-label={`Remove ${cardUid} from the enrolment list`}
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await clearUnassignedCards({
+            schoolId,
+            cardUids: [cardUid],
+          });
+          if (!result.ok) {
+            toast.error(result.error);
+            return;
+          }
+          toast.success(`${cardUid} removed from the list.`, {
+            description: "Tap it on the reader again and it will come back.",
+          });
+          router.refresh();
+        })
+      }
+      className={cn(
+        "absolute top-2 right-2 grid size-7 place-items-center rounded-md text-muted-foreground transition",
+        "opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100",
+        "hover:bg-destructive/10 hover:text-destructive",
+        "disabled:pointer-events-none disabled:opacity-50",
+      )}
+    >
+      {pending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <X className="size-4" />
+      )}
+    </button>
   );
 }
 
