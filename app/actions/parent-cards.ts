@@ -176,3 +176,73 @@ export async function revealParentCard(
     data: { cardNumber: result.card_number, guardianName: result.guardian_name },
   };
 }
+
+/**
+ * The whole school's card numbers, for the printing press.
+ *
+ * This is `revealParentCard` times the roster, so it is fenced the same way and
+ * then some: `pta.parent_card_roster()` checks `is_super_admin()` itself and
+ * writes one audit row per call recording the COUNT and never a number. The
+ * check here only saves a round trip and gives a better message.
+ *
+ * It returns the two fields the press actually needs and no others. The RPC
+ * also hands back a contact number and a child count; those are a family's
+ * details and have no business travelling to a third party, so they stop here.
+ *
+ * The PDF is built in the BROWSER from what this returns (lib/pdf). That is
+ * deliberate: the file is a few hundred KB of credentials and there is no
+ * reason for it to exist on a server, in a response cache, or in a log.
+ */
+export async function parentCardRoster(schoolId: unknown): Promise<
+  ActionResult<{
+    schoolName: string;
+    generatedAt: string;
+    entries: { guardian_name: string; card_number: string }[];
+  }>
+> {
+  const session = await getSessionContext();
+  if (!session?.isSuperAdmin) {
+    return { ok: false, error: "Only a super admin can print the card roster." };
+  }
+
+  const parsed = dbId().safeParse(schoolId);
+  if (!parsed.success) return { ok: false, error: "Unknown school." };
+
+  const supabase = await createClient();
+
+  const [{ data: school }, { data, error }] = await Promise.all([
+    supabase
+      .from("schools")
+      .select("name, timezone")
+      .eq("id", parsed.data)
+      .maybeSingle<{ name: string; timezone: string }>(),
+    supabase.rpc("parent_card_roster", { p_school_id: parsed.data }),
+  ]);
+
+  if (error) return { ok: false, error: error.message };
+  if (!school) return { ok: false, error: "Unknown school." };
+
+  const rows = (data ?? []) as {
+    guardian_name: string;
+    card_number: string;
+  }[];
+
+  return {
+    ok: true,
+    data: {
+      schoolName: school.name,
+      // Formatted here, in the school's own timezone, for the same reason
+      // every other date in this project is: the browser's clock is not the
+      // school's (D11).
+      generatedAt: new Intl.DateTimeFormat("en-PH", {
+        dateStyle: "long",
+        timeStyle: "short",
+        timeZone: school.timezone,
+      }).format(new Date()),
+      entries: rows.map((r) => ({
+        guardian_name: r.guardian_name,
+        card_number: r.card_number,
+      })),
+    },
+  };
+}

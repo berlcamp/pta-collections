@@ -841,6 +841,23 @@ export interface ParentCardPending {
   children: number;
 }
 
+/**
+ * pta.parent_card_roster() — the printing press list (0022).
+ *
+ * The one place in this project that carries a card number in the clear. It
+ * reaches TypeScript only inside a super admin's request for the print page,
+ * is never stored, and never goes near a list screen.
+ */
+export interface ParentCardRosterRow {
+  account_id: string;
+  guardian_id: string;
+  guardian_name: string;
+  contact_number: string | null;
+  children: number;
+  card_number: string;
+  issued_at: string;
+}
+
 /** Minimal shape the Supabase client needs; RPC args/returns are typed at call sites. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Database = any;

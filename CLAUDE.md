@@ -238,6 +238,59 @@ Functions, Telegram's `setWebhook`, and `SUPABASE_JWT_SECRET`.
 token, so every school shares one bot until `notify-guardian` learns to look a
 token up per school.
 
+### A parent card follows the child, and is not clicked
+`0022_parent_cards_automatic.sql`. Linking a guardian to a student MINTS their
+parent card in the same transaction. Read that migration's header before
+touching any of it.
+
+- **The trigger is on `student_guardians`, not `parents_guardians`.** A card
+  shows a guardian their children; a guardian with no child would sign in to an
+  empty portal. `donors` and `parents_guardians` overlap (0014), so a school has
+  guardian rows that are donors and nothing else — PP17n has always said such a
+  person is not "awaiting a card", and 0022 must not hand them a live bearer
+  credential. Firing on the link covers the roster (the guardian row and the
+  link are written in one transaction by `createStudent` and by
+  `commit_student_import`) and correctly skips the donor.
+- **`mint_parent_card()` is the issuance with NO authorization in it**, granted
+  to nobody, called only by `issue_parent_card()` (which checks the role) and by
+  the trigger (which has no role to check — the insert it hangs off was already
+  authorized). A card minted automatically and a card minted by a click are the
+  same object, down to the audit row.
+- **The trigger swallows its own exception, on purpose.** A card is a
+  consequence of enrolling a child, not a precondition: a raising trigger would
+  roll back a student registration or take down a 4,000-row CSV import over a
+  credential that can be re-minted in one click. It is not quiet where it
+  matters — the guardian stays in `v_parent_cards_pending`, which the
+  "Missed a card" tile counts, and Issue still works. **That view is now a
+  REPAIR surface, not a work queue, and should read zero.**
+- **Nobody reads the bootstrap PIN any more.** An automatic issuance has no
+  person to show it to, so it is hashed and never seen. With
+  `portal_require_pin` off (the default, 0017) that changes nothing; with it on,
+  `reset_parent_pin()` at the counter is the answer — which is where a PIN
+  should be handed over anyway. A PIN is still minted and hashed every time, so
+  turning the setting on later still needs no reissue.
+- **`parent_card_roster()` is a BULK reveal and carries 0020's price**: super
+  admin only via `is_super_admin()`, an RPC and never a view column, active
+  cards only, and one audit row per run recording the COUNT and never a number
+  (PP14). It backs the one door to card numbers in bulk — the "Download list for
+  the press" button on `/super/parent-cards`, which downloads a PDF and **renders
+  nothing**: the numbers go from the action into the file and out through a blob
+  URL revoked on the next line, never onto a screen or into the DOM.
+- **The roster PDF drops the contact number and the child count** even though
+  the RPC returns them. The file leaves the building — a press needs a name, a
+  number and bars, and a family's details have no business travelling with them.
+- **`lib/pdf/` is hand-written, and is not a reversal of D19.** "No PDF library"
+  was about not carrying jsPDF and its font subsetting so a receipt could be a
+  print stylesheet, and every other printed document here still is one. This is
+  the one document nobody prints themselves: it is emailed to a press, so it has
+  to be a FILE, and a print dialog cannot make one without a human picking "Save
+  as PDF" and holding the scale at 100% — below that the bars narrow and
+  scanners start refusing them. So it is the `lib/barcode.ts` trade again:
+  base-14 fonts, WinAnsiEncoding, no compression, no images, ~250 pure lines
+  covered by `npm run test`. **Do not install a PDF library on the strength of
+  this file**, and do not grow it into one — a second such document is a reason
+  to reopen the decision, not to extend the writer.
+
 ### Creating a school year enrolls NOBODY — promotion does
 `0021_student_promotion.sql`. `saveSchoolYear` inserts a `school_years` row and
 flips `is_active`; it touches no student. Enrollment is per
@@ -290,7 +343,9 @@ commit it previews:
   paid/partial/unpaid column.
 - Day boundaries are computed in SQL in `Asia/Manila`, never in the browser.
   `v_donations_local` does for donations what `v_payments_local` does for fees.
-- No credit balances, no line-level voids, no PDF library, no `xlsx`, no `use cache`.
+- No credit balances, no line-level voids, no `xlsx`, no `use cache`. No PDF
+  library either — printed documents are print stylesheets; `lib/pdf/` is the
+  single hand-written exception and says why in its header.
 - `SUPABASE_SERVICE_ROLE_KEY` appears in no request path.
 
 ## Commands

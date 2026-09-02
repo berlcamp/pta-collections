@@ -65,6 +65,11 @@ type Slip = {
 /**
  * Issue, revoke, reset.
  *
+ * Issuing is no longer the main event. 0022 mints a card the moment a guardian
+ * is linked to a student, so the "Missed a card" list below should be empty and
+ * the button on it is a REPAIR — the way back when the trigger did not run. The
+ * numbers themselves leave by the print roster, not one dialog at a time.
+ *
  * The card number and the bootstrap PIN are shown EXACTLY ONCE, in the dialog
  * below, and are unrecoverable afterwards — the list masks the number and the
  * PIN exists only as a salted hash. That is deliberate friction: a credential
@@ -163,14 +168,14 @@ export function ParentCardManager({
     <>
       <div className="mt-8">
         <SectionHeader
-          title="Awaiting a card"
-          description="Guardians with a child on file who cannot reach the portal yet. Issuing shows the number once."
+          title="Missed a card"
+          description="A guardian with a child on file is issued a card automatically. Anyone here was missed — issuing by hand is the way back, and shows the number once."
         />
         {pending.length === 0 ? (
           <EmptyState
             icon={UserRoundPlus}
-            title="Everyone has a card"
-            description="Every guardian with a child on file at this school already holds one."
+            title="Nobody was missed"
+            description="Every guardian with a child on file at this school holds a card, issued the moment that child was linked to them."
           />
         ) : (
           <PendingCardsTable
@@ -184,7 +189,7 @@ export function ParentCardManager({
       <div className="mt-8">
         <SectionHeader
           title="Issued cards"
-          description="Revoking signs the parent out immediately, even mid session. Nothing is deleted."
+          description="Revoking signs the parent out immediately, even mid session. Nothing is deleted. “Download list for the press” above saves the whole school’s numbers and barcodes as a PDF."
         />
         {issued.length === 0 ? (
           <EmptyState

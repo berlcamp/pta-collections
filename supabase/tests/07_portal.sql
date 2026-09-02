@@ -115,6 +115,12 @@ select 'ben',   g.id from pta.parents_guardians g join pta.schools s on s.id=g.s
  where s.school_code='ONHS' and g.first_name='Ben';
 insert into _ids
 select 'onhs',  id from pta.schools where school_code='ONHS';
+-- Rosa, from 05_donations: a DONOR guardian with no child on file. She is the
+-- one person in this database 0022's trigger must leave alone, so she is also
+-- the only guardian left who can stand for "no portal account at all".
+insert into _ids
+select 'rosa',  g.id from pta.parents_guardians g join pta.schools s on s.id=g.school_id
+ where s.school_code='ONHS' and g.first_name='Rosa';
 select pta_test.logout();
 
 select pta_test.login(:B_ADMIN::uuid);
@@ -177,31 +183,42 @@ select pta_test.eq(length(pta.generate_pin()), 6,
 
 -- ---------------------------------------------------------------------------
 -- Issuance
+--
+-- 0022 moved this: linking a guardian to a student MINTS the card, so by the
+-- time this section runs Ana and Ben already hold one and the queue they used
+-- to sit in is empty. What is asserted here is unchanged in substance — the
+-- number is Luhn-valid, the PIN is a bootstrap, one card per guardian, the
+-- number is never readable off a list — but nothing below issues anything.
 -- ---------------------------------------------------------------------------
 select pta_test.login(:A_ADMIN::uuid);
 
--- The queue the "Awaiting a card" list is built from: a guardian with a child
--- on file and no card yet. Two of them at School A — Ana and Ben. (Rosa, from
--- 05_donations, is a donor with no child on file and is covered at PP17g.)
-select pta_test.eq((select count(*) from pta.v_parent_cards_pending)::int, 2,
-  'PP8b. A guardian with a child and no card is awaiting one');
+-- The queue the "Awaiting a card" list is built from, and 0022's whole claim:
+-- it is empty by construction, because the trigger's rule IS this view's rule.
+-- A row here is now a repair, not a job. (Rosa, from 05_donations, is a donor
+-- with no child on file and is covered at PP17n.)
+select pta_test.eq((select count(*) from pta.v_parent_cards_pending)::int, 0,
+  'PP8b. Nobody is awaiting a card — linking a child already issued one');
 
 create temp table _cards (who text, card text, pin text, account uuid);
 
-insert into _cards
-select 'ana',
-       (r ->> 'card_number'), (r ->> 'pin'), (r ->> 'account_id')::uuid
-from (select pta.issue_parent_card(
-        (select v from _ids where k='ana')) as r) t;
+-- Reading the numbers back needs the harness's OWN session, out of any role:
+-- PP17b-PP17e still assert that no staff token can read this table, and a
+-- super admin reaches one number at a time through reveal_parent_card().
+select pta_test.logout();
+insert into _cards (who, card, account)
+select i.k, a.card_number, a.id
+  from _ids i
+  join pta.portal_accounts a on a.guardian_id = i.v
+ where i.k in ('ana', 'ben');
+select pta_test.login(:A_ADMIN::uuid);
 
-insert into _cards
-select 'ben',
-       (r ->> 'card_number'), (r ->> 'pin'), (r ->> 'account_id')::uuid
-from (select pta.issue_parent_card(
-        (select v from _ids where k='ben')) as r) t;
+-- Nobody ever saw the PIN these cards were minted with — that is the cost 0022
+-- accepts, and reset_parent_pin() is the remedy it points at. The tests below
+-- need a PIN they know, so they take the same road a school would.
+update _cards set pin = (pta.reset_parent_pin(account) ->> 'pin');
 
 select pta_test.eq((select count(*) from pta.v_parent_cards_detail)::int, 2,
-  'PP9. An admin can issue a parent card');
+  'PP9. Both guardians hold a card without anyone having issued one');
 select pta_test.ok(
   (select pta.luhn_ok(card) and length(card) = 16 from _cards where who = 'ana'),
   'PP10. Issuance returns a Luhn-valid 16-digit card number');
@@ -246,14 +263,23 @@ select pta_test.throws($$
   select pta.issue_parent_card(
     (select v from _ids where k='ben'))
 $$, 'PP16. Another school''s admin cannot issue a card to your guardian');
-select pta_test.eq((select count(*) from pta.v_parent_cards_detail)::int, 0,
-  'PP17. School B sees none of School A''s parent cards');
+-- Carla is School B's own guardian and 0022 minted her a card too, so the
+-- isolation question is no longer "does B see zero cards" but "does B see only
+-- its own" — which is the sharper question anyway.
+select pta_test.eq((select count(*) from pta.v_parent_cards_detail)::int, 1,
+  'PP17. School B sees exactly one card — its own guardian''s');
+select pta_test.ok(
+  not exists (select 1 from pta.v_parent_cards_detail
+               where guardian_id in (select v from _ids where k in ('ana', 'ben'))),
+  'PP17aa. ...and none of School A''s, whose guardians it cannot even name');
 -- 0020 made v_parent_cards_pending a DEFINER view, so RLS on
 -- parents_guardians no longer scopes it and the compiled-in
--- current_school_ids() filter is the only thing standing here. Carla is School
--- B's own guardian; Ana, Ben and Rosa must not appear.
-select pta_test.eq((select count(*) from pta.v_parent_cards_pending)::int, 1,
-  'PP17a. School B sees only its OWN guardians awaiting a card');
+-- current_school_ids() filter is the only thing standing here. Under 0022 the
+-- queue is empty on both sides — Carla was carded by the trigger like everyone
+-- else — so what this asserts now is that School B is not shown School A's
+-- guardians in a list that no longer has a tenant's RLS behind it.
+select pta_test.eq((select count(*) from pta.v_parent_cards_pending)::int, 0,
+  'PP17a. School B is awaiting no cards, and is shown none of School A''s');
 select pta_test.logout();
 
 -- ---------------------------------------------------------------------------
@@ -648,11 +674,22 @@ select pta_test.ok(
   'PP49. Ben does not see Juan, who is Ana''s child');
 select pta_test.logout();
 
--- A guardian at School B sees nothing of School A, and vice versa.
+-- Somebody with no portal account resolves to nobody at all. Under 0022 that
+-- is no longer Carla — she has a child at School B and so the trigger carded
+-- her — but Rosa, the donor with no child on file, whom it deliberately skips.
 select pta_test.portal_login(
-  (select v from _ids where k='carla'));
+  (select v from _ids where k='rosa'));
 select pta_test.eq((select count(*) from pta.v_portal_children)::int, 0,
   'PP50. A guardian with no portal account resolves to nobody at all');
+select pta_test.logout();
+
+-- A guardian at School B sees her own child and nothing of School A.
+select pta_test.portal_login(
+  (select v from _ids where k='carla'));
+select pta_test.ok(
+  not exists (select 1 from pta.v_portal_children
+               where full_name like 'Cruz, Juan%' or full_name like '%Pedro%'),
+  'PP50a. School B''s guardian sees none of School A''s children');
 select pta_test.logout();
 
 -- STAFF through the portal views. This is the assertion that catches a missing
@@ -1432,3 +1469,164 @@ select pta_test.eq(
   pta.portal_login('4539578763621486', null, '10.0.5.3') ->> 'reason',
   'invalid',
   'PP150. ...and an unknown card still says only "invalid", never "pin_required"');
+
+-- ===========================================================================
+-- 0022 — the card follows the child
+--
+-- Issuance stopped being a click. Linking a guardian to a student mints their
+-- card in the same transaction, the roster that was already enrolled was
+-- backfilled, and a super admin can read the whole school's numbers out once to
+-- hand to a printing press. Each of those loosens something 0016 tightened, so
+-- each is pinned here.
+-- ===========================================================================
+
+select pta_test.login(:A_ADMIN::uuid);
+
+-- The backfill. Every guardian in this database with a child on file was
+-- carded by the migration or by the trigger; the only guardian without a card
+-- is the one who has no child. That is 0022's central claim, stated once.
+select pta_test.logout();
+select pta_test.eq(
+  (select count(*)::int from pta.parents_guardians g
+    where exists (select 1 from pta.student_guardians sg where sg.guardian_id = g.id)
+      and not exists (select 1 from pta.portal_accounts a where a.guardian_id = g.id)),
+  0, 'PC1. No guardian with a child on file is without a card, in any school');
+select pta_test.ok(
+  not exists (select 1 from pta.portal_accounts a
+               join pta.parents_guardians g on g.id = a.guardian_id
+              where not exists (select 1 from pta.student_guardians sg
+                                 where sg.guardian_id = g.id)),
+  'PC2. ...and no guardian without one holds a card they could see nothing with');
+
+-- A brand new parent, added the way the student form adds one.
+select pta_test.login(:A_ADMIN::uuid);
+insert into pta.parents_guardians (school_id, first_name, last_name, contact_number)
+select (select v from _ids where k='onhs'), 'Dolores', 'Aquino', '09171110009';
+insert into _ids
+select 'dolores', g.id from pta.parents_guardians g
+ where g.school_id = (select v from _ids where k='onhs') and g.first_name = 'Dolores';
+
+-- Not yet. A card shows a guardian their children; this one has none, and 0014
+-- gives a school plenty of guardian rows that are donors and nothing else.
+select pta_test.ok(
+  not exists (select 1 from pta.v_parent_cards_detail
+               where guardian_id = (select v from _ids where k='dolores')),
+  'PC3. Creating a guardian alone issues nothing — there is nothing to show them');
+
+insert into pta.student_guardians (school_id, student_id, guardian_id, relationship, is_primary)
+select (select v from _ids where k='onhs'), (select v from _ids where k='maria'),
+       (select v from _ids where k='dolores'), 'Mother', false;
+
+select pta_test.eq(
+  (select count(*)::int from pta.v_parent_cards_detail
+    where guardian_id = (select v from _ids where k='dolores')),
+  1, 'PC4. Linking her to a child issues the card, with nobody clicking Issue');
+
+select pta_test.logout();
+select pta_test.ok(
+  (select pta.luhn_ok(card_number) and length(card_number) = 16 and status = 'active'
+     from pta.portal_accounts
+    where guardian_id = (select v from _ids where k='dolores')),
+  'PC5. An automatic card is the same object as a clicked one — Luhn, 16, active');
+select pta_test.ok(
+  (select must_change_pin from pta.portal_accounts
+    where guardian_id = (select v from _ids where k='dolores')),
+  'PC6. It still mints and hashes a PIN, so turning the setting on needs no reissue');
+
+-- A sibling. The second link must be a no-op, not a second credential for one
+-- human and not an error that takes the enrolment down with it.
+select pta_test.login(:A_ADMIN::uuid);
+insert into pta.student_guardians (school_id, student_id, guardian_id, relationship, is_primary)
+select (select v from _ids where k='onhs'), (select v from _ids where k='pedro'),
+       (select v from _ids where k='dolores'), 'Mother', false;
+select pta_test.eq(
+  (select count(*)::int from pta.v_parent_cards_detail
+    where guardian_id = (select v from _ids where k='dolores')),
+  1, 'PC7. A second child under the same parent does not mint a second card');
+
+-- Issuance is still audited, and still without the number in it (PP14).
+select pta_test.eq(
+  (select count(*)::int from pta.audit_logs
+    where action = 'PORTAL_CARD_ISSUED'
+      and new_values ->> 'guardian_id' = (select v::text from _ids where k='dolores')),
+  1, 'PC8. An automatic issuance writes exactly one audit row');
+select pta_test.logout();
+select pta_test.ok(
+  not exists (select 1 from pta.audit_logs
+               where action = 'PORTAL_CARD_ISSUED'
+                 and new_values::text like '%' ||
+                     (select left(card_number, 8) from pta.portal_accounts
+                       where guardian_id = (select v from _ids where k='dolores')) || '%'),
+  'PC9. ...and no more records the number than a clicked one did');
+
+-- The unauthorized half of an issuance is granted to nobody. It is called only
+-- by issue_parent_card() and by the trigger, both of which run as the owner.
+select pta_test.login(:A_ADMIN::uuid);
+select pta_test.throws($$
+  select pta.mint_parent_card((select v from _ids where k='dolores'))
+$$, 'PC10. mint_parent_card is not callable by staff — it checks no role at all');
+select pta_test.logout();
+select pta_test.login(:SUPER::uuid);
+select pta_test.throws($$
+  select pta.mint_parent_card((select v from _ids where k='dolores'))
+$$, 'PC11. ...nor by a super admin');
+select pta_test.logout();
+
+-- ---------------------------------------------------------------------------
+-- The print roster: a bulk reveal, priced like reveal_parent_card()
+-- ---------------------------------------------------------------------------
+
+select pta_test.login(:A_ADMIN::uuid);
+select pta_test.throws($$
+  select * from pta.parent_card_roster((select v from _ids where k='onhs'))
+$$, 'PC12. An admin cannot print the card roster — issuing is not reading back');
+select pta_test.logout();
+
+select pta_test.login(:A_CASHIER::uuid);
+select pta_test.throws($$
+  select * from pta.parent_card_roster((select v from _ids where k='onhs'))
+$$, 'PC13. Neither can a cashier, who reads card numbers off the scanner all day');
+select pta_test.logout();
+
+select pta_test.portal_login((select v from _ids where k='ben'));
+select pta_test.throws($$
+  select * from pta.parent_card_roster((select v from _ids where k='onhs'))
+$$, 'PC14. Nor a parent holding a portal token');
+select pta_test.logout();
+
+select pta_test.login(:SUPER::uuid);
+select pta_test.eq(
+  (select count(*)::int from pta.parent_card_roster((select v from _ids where k='onhs'))),
+  (select count(*)::int from pta.v_parent_cards_detail
+    where school_id = (select v from _ids where k='onhs') and status = 'active'),
+  'PC15. A super admin gets every ACTIVE card at the school, and no more');
+
+select pta_test.ok(
+  (select bool_and(pta.luhn_ok(card_number) and length(card_number) = 16)
+     from pta.parent_card_roster((select v from _ids where k='onhs'))),
+  'PC16. The roster carries the real number — this is what the press prints');
+
+-- Ana's card was revoked at PP115. A revoked number has nothing to print, and
+-- printing it would put a dead credential on a laminated card.
+select pta_test.ok(
+  not exists (select 1 from pta.parent_card_roster((select v from _ids where k='onhs'))
+               where guardian_id = (select v from _ids where k='ana')),
+  'PC17. A revoked card is not on the roster');
+
+select pta_test.eq(
+  (select count(*)::int from pta.parent_card_roster((select v from _ids where k='onhs'))
+    where guardian_id = (select v from _ids where k='carla')),
+  0, 'PC18. The roster is one school''s — School B''s guardian is not on it');
+
+select pta_test.eq(
+  (select count(*)::int from pta.audit_logs
+    where action = 'PORTAL_CARD_ROSTER_PRINTED'
+      and school_id = (select v from _ids where k='onhs')),
+  4, 'PC19. Every print run is audited — one row per call, four calls above');
+
+select pta_test.ok(
+  not exists (select 1 from pta.audit_logs
+               where action = 'PORTAL_CARD_ROSTER_PRINTED'
+                 and new_values::text ~ '[0-9]{16}'),
+  'PC20. ...recording the count and never a single number');
+select pta_test.logout();

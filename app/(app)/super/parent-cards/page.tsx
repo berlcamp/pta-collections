@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { StatCard } from "@/components/common/stat-card";
 import { EmptyState } from "@/components/common/empty-state";
 import { GateSchoolPicker } from "@/components/gate/gate-school-picker";
+import { ParentCardRosterButton } from "@/components/portal/parent-card-roster-button";
 import { ParentCardManager } from "@/components/portal/parent-card-manager";
 import type {
   ParentCardDetail,
@@ -86,10 +87,22 @@ export default async function ParentCardsPage({
         title="Parent cards"
         description={
           pinRequired
-            ? "A 16-digit barcode a guardian signs in to the Parent Portal with. Issuing shows the number and a temporary PIN once — neither can be retrieved afterwards."
-            : "This school signs parents in with the card alone, so whoever holds the number sees that child's gate arrivals. Revoke a lost one the way you would change a lock, or add a PIN under Administration → Settings → Parent Portal."
+            ? "A 16-digit barcode a guardian signs in to the Parent Portal with. Every guardian with a child on file is issued one automatically; the PIN nobody saw is replaced with Reset PIN, at the counter."
+            : "A 16-digit barcode a guardian signs in to the Parent Portal with, issued automatically to every guardian with a child on file. This school signs parents in with the card alone, so whoever holds the number sees that child's gate arrivals — revoke a lost one the way you would change a lock."
         }
-        actions={<GateSchoolPicker schools={schools} selected={school.id} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <GateSchoolPicker schools={schools} selected={school.id} />
+            {/* The only door to card numbers in bulk. It downloads a file and
+                renders nothing — the numbers never reach a screen. Audited on
+                every click; see pta.parent_card_roster() in 0022. */}
+            <ParentCardRosterButton
+              schoolId={school.id}
+              schoolCode={school.school_code}
+              disabled={active.length === 0}
+            />
+          </div>
+        }
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -100,12 +113,18 @@ export default async function ParentCardsPage({
           icon={IdCard}
           tone="positive"
         />
+        {/* Should read zero. Issuance is automatic (0022), so this counts the
+            guardians the trigger failed on — a repair queue, not a work queue. */}
         <StatCard
-          label="Awaiting a card"
+          label="Missed a card"
           value={pending.length.toLocaleString()}
-          hint="they cannot reach the portal at all"
+          hint={
+            pending.length > 0
+              ? "issuance did not run for them — issue by hand"
+              : "issuance is automatic, and nobody was missed"
+          }
           icon={UserRoundPlus}
-          tone={pending.length > 0 ? "warning" : "default"}
+          tone={pending.length > 0 ? "warning" : "positive"}
         />
         <StatCard
           label="Never signed in"
