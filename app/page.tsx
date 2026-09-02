@@ -28,8 +28,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { GateFlow } from "@/components/marketing/gate-flow";
 import { GatePreview } from "@/components/marketing/gate-preview";
 import { LedgerPreview } from "@/components/marketing/ledger-preview";
+import { PortalPreview } from "@/components/marketing/portal-preview";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/auth/permissions";
 
 /**
@@ -347,9 +349,14 @@ export default function LandingPage() {
               </p>
             </div>
 
+            {/* The chain first, as a picture, then the same chain as prose. */}
+            <div className="mt-12">
+              <GateFlow />
+            </div>
+
             {/* The rule down the left is the spine of the sequence — it is what
                 makes four cards read as four steps. */}
-            <ol className="mt-12 grid gap-px bg-border md:grid-cols-2">
+            <ol className="mt-10 grid gap-px bg-border md:grid-cols-2">
               {GATE_STEPS.map(({ n, icon: Icon, title, body }) => (
                 <li key={n} className="relative bg-background p-7 sm:p-9">
                   <div className="flex items-baseline gap-4">
@@ -410,7 +417,7 @@ export default function LandingPage() {
             a card rather than an invitation. */}
         <section id="parents" className="border-b border-border bg-background">
           <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
-            <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr]">
+            <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_auto] lg:gap-16">
               <div>
                 <p className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 font-mono text-[0.7rem] tracking-widest uppercase text-muted-foreground">
                   <IdCard className="size-3.5" />
@@ -451,23 +458,28 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <ul className="grid gap-4 sm:grid-cols-2">
-                {PARENT_FEATURES.map((f) => (
-                  <li
-                    key={f.title}
-                    className="rounded-2xl border border-border bg-card p-5 shadow-sm"
-                  >
-                    <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <f.icon className="size-5" />
-                    </span>
-                    <p className="mt-4 font-medium">{f.title}</p>
-                    <p className="mt-1.5 text-sm text-pretty text-muted-foreground">
-                      {f.body}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              {/* The screen itself takes the column the feature cards used to
+                  hold; the cards drop to a full-width row below, where four of
+                  them read better than two-by-two in a narrow column. */}
+              <PortalPreview />
             </div>
+
+            <ul className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {PARENT_FEATURES.map((f) => (
+                <li
+                  key={f.title}
+                  className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+                >
+                  <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <f.icon className="size-5" />
+                  </span>
+                  <p className="mt-4 font-medium">{f.title}</p>
+                  <p className="mt-1.5 text-sm text-pretty text-muted-foreground">
+                    {f.body}
+                  </p>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
