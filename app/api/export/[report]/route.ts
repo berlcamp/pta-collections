@@ -4,6 +4,11 @@ import { can } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSchoolYear } from "@/lib/data/school";
 import {
+  attendanceWindow,
+  getAttendanceDays,
+  getAttendanceStudents,
+} from "@/lib/data/attendance";
+import {
   getAnnualReport,
   getCashierReport,
   getCollectionReport,
@@ -16,6 +21,7 @@ import {
   getProgramTotals,
 } from "@/lib/data/donations";
 import { formatMoneyForExport } from "@/lib/financial/money";
+import { todayInTimezone } from "@/lib/utils/dates";
 import { csvResponse, toCsv } from "@/lib/utils/csv";
 
 export const dynamic = "force-dynamic";
@@ -278,6 +284,50 @@ export async function GET(
             r.last_donation_at,
           ]),
         ),
+      );
+    }
+
+    case "attendance": {
+      const { from, to } = attendanceWindow(
+        schoolYear,
+        filters.from,
+        filters.to,
+        todayInTimezone(ctx.activeSchool.timezone),
+      );
+      const [days, students] = await Promise.all([
+        getAttendanceDays(ctx.activeSchool.id, from, to),
+        getAttendanceStudents(ctx.activeSchool.id, schoolYear.id, from, to),
+      ]);
+      const schoolDays = days.length;
+
+      // One file, two blocks, the same shape as the annual report: the daily
+      // totals a treasurer reads and the per-student roll a class adviser does.
+      // "Days present" is left EMPTY for a student holding no card rather than
+      // written as 0 — in a spreadsheet a zero sorts and sums, and this one
+      // would put a child with no plastic at the top of a truancy list.
+      const rows: (string | number)[][] = [
+        ...days.map((d) => [
+          d.local_date,
+          d.students_present,
+          d.scans,
+          d.unknown_scans,
+          "",
+        ]),
+        ["", "", "", "", ""],
+        ["STUDENT BY STUDENT", "", "", "", ""],
+        ["Student", "Grade", "Section", "Holds a card", `Days present of ${schoolDays}`],
+        ...students.map((s) => [
+          s.full_name,
+          s.grade_level ?? "",
+          s.section_name ?? "",
+          s.has_card ? "Yes" : "No",
+          s.has_card ? s.days_present : "",
+        ]),
+      ];
+
+      return csvResponse(
+        `attendance-${stamp}-${from}-to-${to}.csv`,
+        toCsv(["Date", "Students present", "Taps", "Unknown taps", ""], rows),
       );
     }
 

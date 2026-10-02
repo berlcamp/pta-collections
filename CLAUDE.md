@@ -335,6 +335,39 @@ commit it previews:
   handed it to someone else, because `student_enrollments_number_idx` is not
   what the `on conflict` covers and a collision would take the whole run down.
 
+### Attendance is REPORTED, never measured
+`0024_attendance_reports.sql` backs Reports → Attendance and the Attendance tab
+on `/students/[id]`. Two SECURITY INVOKER functions, `pta.attendance_day_summary()`
+and `attendance_student_summary()` — reads, so RLS decides, the same call
+`promotion_plan()` makes. Neither is granted to `service_role` or `anon`.
+
+- **They are functions because PostgREST cannot GROUP BY.** A term of a
+  4,000-student school is a hundred thousand scans; the alternative is shipping
+  them all to Node and bucketing days in the browser, which is what D11 exists
+  to forbid.
+- **The denominator is CARDED students, never enrolled ones.** A school midway
+  through issuing cards would otherwise read as a school with an attendance
+  crisis. `has_card` comes back on every row so a zero can be labelled as
+  *cannot be seen* rather than *did not come*, and both the report and the CSV
+  keep the two apart — the export writes an EMPTY cell, not `0`, for a
+  cardless student, because a zero in a spreadsheet sorts and sums.
+- **A day nobody tapped is not a row.** A Sunday, a holiday, a typhoon closure
+  and an unplugged reader are indistinguishable in this data, so the count of
+  "school days" is the count of days that saw anyone. Do not synthesise the
+  missing ones; there would be no honest label for them.
+- **Nothing counts lateness, half-days or direction.** One reader cannot tell
+  an arrival from a departure — the same reason `/super/attendance` calls the
+  first tap of the day an arrival *by rule*.
+- `/super/attendance` is the live board and stays a super-admin page on a
+  `?school=` picker (D2). This one is a school-scoped report on the active
+  school, like every other page under Reports.
+
+Student pages carry in-page tabs on `?tab=` (`components/common/page-tabs.tsx`),
+NOT Radix `Tabs`: each panel is a different set of server queries — the gate
+reads do not run while you are reading the fee ledger — so the tab has to be
+part of the request, and a tab in the URL is linkable, which the attendance
+report relies on.
+
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through
   `SECURITY DEFINER` RPCs in `pta`. Never write `payments` or `donations` from

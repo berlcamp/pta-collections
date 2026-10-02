@@ -617,6 +617,39 @@ export interface GateRosterEntry {
   school_year_id: string;
 }
 
+/** pta.attendance_day_summary() — one row per day the gate saw anyone (0024).
+ *  Days with no activity are ABSENT rather than zero: the database cannot tell
+ *  a Sunday from a holiday from a dead reader, so it does not guess. */
+export interface AttendanceDay {
+  local_date: string;
+  /** Distinct students. Unknown cards are not counted here — they are in
+   *  unknown_scans, because nobody knows who they were. */
+  students_present: number;
+  scans: number;
+  unknown_scans: number;
+  first_scan_at: string;
+  last_scan_at: string;
+}
+
+/** pta.attendance_student_summary() — the whole roll for a school year, seen
+ *  or not (0024). A student with days_present 0 and has_card false was not
+ *  absent; they were invisible. Never add the two together. */
+export interface AttendanceStudent {
+  student_id: string;
+  full_name: string;
+  student_no: string | null;
+  grade_level: string | null;
+  section_name: string | null;
+  student_status: StudentStatus;
+  has_card: boolean;
+  /** Distinct days, not taps: in-and-out on one day is one day. */
+  days_present: number;
+  scans: number;
+  first_seen: string | null;
+  last_seen: string | null;
+  last_scan_at: string | null;
+}
+
 /* ---------------------------------------------------------------------------
  * Parent/Guardian portal (0016)
  * ------------------------------------------------------------------------- */

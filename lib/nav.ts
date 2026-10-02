@@ -36,6 +36,7 @@ export type NavIconName =
   | "Users"
   | "ScrollText"
   | "CalendarRange"
+  | "CalendarCheck"
   | "BookUser"
   | "ShieldCheck"
   | "Settings"
@@ -135,6 +136,11 @@ export const SCHOOL_NAV: NavGroup[] = [
           { label: "Fee types", href: "/reports/fee-types", icon: "FileSpreadsheet" },
           { label: "Cashiers", href: "/reports/cashiers", icon: "Users" },
           { label: "Donations", href: "/reports/donations", icon: "Gift" },
+          // Attendance is a report even though its data comes from the gate:
+          // the live board under Super admin answers "who is here now", and
+          // this answers "how has the term gone", which is a reporting
+          // question and belongs beside the other terms' worth of numbers.
+          { label: "Attendance", href: "/reports/attendance", icon: "CalendarCheck" },
           { label: "Annual PTA report", href: "/reports/annual", icon: "ScrollText" },
         ],
       },
