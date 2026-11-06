@@ -52,6 +52,7 @@ export async function createPayment(
   revalidatePath("/collections/today");
   revalidatePath("/dashboard");
   revalidatePath(`/students/${v.studentId}`);
+  revalidatePath("/cashier", "layout");
 
   return {
     ok: true,

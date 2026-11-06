@@ -108,6 +108,89 @@ export async function getCollectionReport(
   });
 }
 
+export interface CashierReceiptRow {
+  id: string;
+  receipt_number: string;
+  collection_date: string;
+  payment_date: string;
+  student_name: string;
+  fee_names: string;
+  total_amount: number;
+  payment_method: string;
+  reference_number: string | null;
+  status: string;
+}
+
+/**
+ * One person's receipts over a period: what they hand in at the end of a shift.
+ *
+ * This is deliberately not getCollectionReport with a filter. That report is
+ * pinned to one school year, and a cashier who took an old year's dues this
+ * morning holds that cash today, so a year filter would leave the report short
+ * of the drawer. Voided receipts are returned too: the printed series should read
+ * without gaps, and the caller keeps them out of the totals.
+ */
+export async function getCashierReceipts(f: {
+  schoolId: string;
+  cashierId: string;
+  from: string;
+  to: string;
+}): Promise<CashierReceiptRow[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("v_payments_local")
+    .select(
+      "id,receipt_number,collection_date,payment_date,total_amount," +
+        "payment_method,reference_number,student_id,collected_by,status",
+    )
+    .eq("school_id", f.schoolId)
+    .eq("collected_by", f.cashierId)
+    .gte("collection_date", f.from)
+    .lte("collection_date", f.to)
+    .order("payment_date", { ascending: false })
+    .limit(5000);
+
+  const rows = (data ?? []) as unknown as {
+    id: string;
+    receipt_number: string;
+    collection_date: string;
+    payment_date: string;
+    total_amount: number;
+    payment_method: string;
+    reference_number: string | null;
+    student_id: string;
+    collected_by: string;
+    status: string;
+  }[];
+
+  const [names, feeNames] = await Promise.all([
+    lookupNames(
+      rows.map((r) => r.student_id),
+      [],
+    ),
+    lookupPaymentFeeNames(rows.map((r) => r.id)),
+  ]);
+
+  return rows.map((r) => {
+    const student = names.students.get(r.student_id);
+    return {
+      id: r.id,
+      receipt_number: r.receipt_number,
+      collection_date: r.collection_date,
+      payment_date: r.payment_date,
+      student_name: student
+        ? `${student.last_name}, ${student.first_name}`
+        : "\u2014",
+      fee_names: (feeNames.get(r.id) ?? []).join(", "),
+      total_amount: Number(r.total_amount),
+      payment_method: r.payment_method,
+      reference_number: r.reference_number,
+      status: r.status,
+    };
+  });
+}
+
 export interface FeeTypeTotal {
   fee_type_id: string;
   fee_type_name: string;

@@ -368,6 +368,34 @@ reads do not run while you are reading the fee ledger — so the tab has to be
 part of the request, and a tab in the URL is linkable, which the attendance
 report relies on.
 
+### A cashier works at a desk, not in the app
+`/cashier` (`app/(cashier)/`) is a cashier's entire workspace: Collect, Online
+payments, Report. `app/(app)/layout.tsx` redirects `activeRole === 'cashier'` there
+from every other staff screen, so **cashiers no longer reach Donations, Students or
+Charges**. A super admin holding a cashier membership is not redirected. Admins and
+treasurers may open `/cashier` by URL. No migration backs it: it reads what RLS
+already allows and records through `createPayment` / `create_payment()`.
+
+- **A family's visit is several `create_payment()` calls** (`lib/cashier/settlement.ts`):
+  one per student per school year, because a receipt is numbered from that year's
+  series. It is not one transaction. Each planned receipt holds one idempotency key
+  for the visit, so "Try again" after a partial failure returns issued receipts
+  rather than charging twice, and the screen locks until that is settled.
+- **Balances span every school year.** `lookup_parent_card()` sums all years and D25
+  keeps a graduate's dues, so the desk lists prior-year charges too and they are
+  payable there. `/collections/new` still lists the active year only.
+- **`amount_tendered` is recorded only when one receipt covers the visit.** One bill
+  for two children is true of neither receipt. The desk still shows the change.
+- **Scanners are detected by key timing** (`lib/cashier/scan-buffer.ts`), on the
+  window, because the next card arrives while the cursor is elsewhere. The scan's
+  trailing Enter is swallowed so it cannot press a focused button.
+- **The report is the signed-in person's receipts across ALL years**
+  (`getCashierReceipts`), not `getCollectionReport` filtered: that one is pinned to a
+  school year and would come up short of the drawer. It prints; `exportReports` still
+  excludes cashiers, so there is no CSV. Fees only, as donations are a separate series.
+- **Light only**, forced in `components/layout/theme-provider.tsx` by pathname, because
+  next-themes ignores a nested provider.
+
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through
   `SECURITY DEFINER` RPCs in `pta`. Never write `payments` or `donations` from

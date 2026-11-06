@@ -24,6 +24,8 @@ export function ConfirmPaymentDialog({
   change,
   submitting,
   onConfirm,
+  payerLabel = "Student",
+  description = "A receipt number will be issued. Payments cannot be edited \u2014 a mistake must be voided and re-entered.",
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -34,21 +36,20 @@ export function ConfirmPaymentDialog({
   change: number | null;
   submitting: boolean;
   onConfirm: () => void;
+  payerLabel?: string;
+  description?: string;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Confirm payment</AlertDialogTitle>
-          <AlertDialogDescription>
-            A receipt number will be issued. Payments cannot be edited — a
-            mistake must be voided and re-entered.
-          </AlertDialogDescription>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="space-y-3 text-sm">
           <div>
-            <p className="text-xs text-muted-foreground">Student</p>
+            <p className="text-xs text-muted-foreground">{payerLabel}</p>
             <p className="font-medium">{studentName}</p>
           </div>
 

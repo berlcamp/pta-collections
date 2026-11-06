@@ -64,22 +64,22 @@ export function allocationTotal(lines: AllocationLine[]): number {
 }
 
 /** A line amount may never exceed its own remaining balance. */
-export function setLineAmount(
-  lines: AllocationLine[],
+export function setLineAmount<T extends AllocationLine>(
+  lines: T[],
   chargeId: string,
   amount: number,
-): AllocationLine[] {
+): T[] {
   return lines.map((l) =>
     l.chargeId === chargeId ? { ...l, amount: clampMoney(amount, l.balance) } : l,
   );
 }
 
 /** Toggling a line on resets it to the full remaining balance. */
-export function toggleLine(
-  lines: AllocationLine[],
+export function toggleLine<T extends AllocationLine>(
+  lines: T[],
   chargeId: string,
   selected: boolean,
-): AllocationLine[] {
+): T[] {
   return lines.map((l) =>
     l.chargeId === chargeId
       ? { ...l, selected, amount: selected ? l.balance : l.amount }
@@ -87,11 +87,11 @@ export function toggleLine(
   );
 }
 
-export function selectAll(lines: AllocationLine[]): AllocationLine[] {
+export function selectAll<T extends AllocationLine>(lines: T[]): T[] {
   return lines.map((l) => ({ ...l, selected: true, amount: l.balance }));
 }
 
-export function clearAll(lines: AllocationLine[]): AllocationLine[] {
+export function clearAll<T extends AllocationLine>(lines: T[]): T[] {
   return lines.map((l) => ({ ...l, selected: false }));
 }
 

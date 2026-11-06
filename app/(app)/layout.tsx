@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { AppShell } from "@/components/layout/app-shell";
 
@@ -14,5 +15,13 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await requireSession();
+
+  // A cashier's whole workspace is /cashier. This layout is the door to every
+  // other staff screen, so it is the one place that has to say so. A super
+  // admin holding a cashier membership keeps the full app they administer.
+  if (session.activeRole === "cashier" && !session.isSuperAdmin) {
+    redirect("/cashier");
+  }
+
   return <AppShell session={session}>{children}</AppShell>;
 }
