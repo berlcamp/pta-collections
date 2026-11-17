@@ -13,7 +13,11 @@ export const dynamic = "force-dynamic";
 
 export default async function PenaltiesPage() {
   const ctx = await requireRole(["admin", "treasurer"]);
-  const schoolYear = await resolveSchoolYear(ctx.activeSchool.id);
+  // Fee types do not depend on the year, so they load alongside it.
+  const [schoolYear, feeTypes] = await Promise.all([
+    resolveSchoolYear(ctx.activeSchool.id),
+    getFeeTypes(ctx.activeSchool.id),
+  ]);
 
   if (!schoolYear) {
     return (
@@ -24,7 +28,6 @@ export default async function PenaltiesPage() {
     );
   }
 
-  const feeTypes = await getFeeTypes(ctx.activeSchool.id);
   const penaltyTypes = feeTypes.filter((f) => f.category === "penalty");
 
   const supabase = await createClient();

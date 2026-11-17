@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
@@ -56,32 +57,23 @@ export async function AppShell({
 
   // The switcher lists every active school for a super admin. RLS already
   // limits this to what they may see, so no extra filtering is needed here.
-  let allSchools;
-  if (isSuperAdmin) {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("schools")
-      .select("*")
-      .eq("active", true)
-      .order("name");
-    allSchools = data ?? undefined;
-  }
-
-  // The setup guide is for whoever can act on it: a school admin, or a super
-  // admin operating inside the school (who resolves to admin). A treasurer or
-  // viewer could fix none of it, so they never pay for the counts.
-  let setupChecks;
-  if (activeSchool && activeRole === "admin") {
-    const supabase = await createClient();
-    const checks = await getSchoolSetupChecks(supabase, activeSchool.id, {
-      isSuperAdmin,
-    });
-    if (checks.some((c) => !c.done)) setupChecks = checks;
-  }
+  // It and the sidebar cookie are independent, so they are read together.
+  const [allSchools, store] = await Promise.all([
+    isSuperAdmin
+      ? createClient().then(async (supabase) => {
+          const { data } = await supabase
+            .from("schools")
+            .select("*")
+            .eq("active", true)
+            .order("name");
+          return data ?? undefined;
+        })
+      : Promise.resolve(undefined),
+    cookies(),
+  ]);
 
   // Read the collapse state on the server so a collapsed rail does not flash
   // open on first paint. The cookie name is the one SidebarProvider writes.
-  const store = await cookies();
   const defaultOpen = store.get("sidebar_state")?.value !== "false";
 
   return (
@@ -98,11 +90,18 @@ export async function AppShell({
           <Separator orientation="vertical" className="mr-1 h-5" />
           <AppBreadcrumbs groups={allGroups} />
           <div className="ml-auto flex min-w-0 items-center gap-2">
-            {activeSchool && setupChecks && (
-              <SetupGuideButton
-                schoolName={activeSchool.name}
-                checks={setupChecks}
-              />
+            {/* The guide is for whoever can act on it: a school admin, or a
+                super admin inside the school (who resolves to admin). It is
+                nine count queries, so it streams in behind the header rather
+                than holding the whole page until they return. */}
+            {activeSchool && activeRole === "admin" && (
+              <Suspense fallback={null}>
+                <SetupGuide
+                  schoolId={activeSchool.id}
+                  schoolName={activeSchool.name}
+                  isSuperAdmin={isSuperAdmin}
+                />
+              </Suspense>
             )}
             <SchoolSwitcher session={session} allSchools={allSchools} />
             <ThemeToggle />
@@ -120,4 +119,19 @@ export async function AppShell({
       </SidebarInset>
     </SidebarProvider>
   );
+}
+
+async function SetupGuide({
+  schoolId,
+  schoolName,
+  isSuperAdmin,
+}: {
+  schoolId: string;
+  schoolName: string;
+  isSuperAdmin: boolean;
+}) {
+  const supabase = await createClient();
+  const checks = await getSchoolSetupChecks(supabase, schoolId, { isSuperAdmin });
+  if (checks.every((c) => c.done)) return null;
+  return <SetupGuideButton schoolName={schoolName} checks={checks} />;
 }

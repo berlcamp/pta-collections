@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { NavigationProgress } from "@/components/layout/navigation-progress";
 import { BRAND } from "@/lib/brand/mark";
 import { siteUrl } from "@/lib/brand/site";
 import "./globals.css";
@@ -118,6 +120,11 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-svh bg-background font-sans antialiased">
+        {/* Suspense because it reads useSearchParams(): without a boundary
+            that opts the static landing page out of prerendering. */}
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <ThemeProvider>
           <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
           <Toaster richColors position="top-right" />

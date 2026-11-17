@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +30,17 @@ export interface SessionContext {
  * profile — i.e. an uninvited Google account. Callers redirect; they never
  * fall through to rendering data.
  */
-export async function getSessionContext(): Promise<SessionContext | null> {
+export const getSessionContext = cache(loadSessionContext);
+
+/**
+ * Memoised per request by `cache()` above. The (app) layout and the page
+ * beneath it both resolve the session, and before this each call paid for its
+ * own auth.getUser() round trip to Supabase Auth plus the profile and
+ * membership reads — the same answer fetched twice, in series, on every
+ * navigation. React drops the memo at the end of the request, so nothing is
+ * shared across users or requests.
+ */
+async function loadSessionContext(): Promise<SessionContext | null> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -45,32 +56,37 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 
   const isSuperAdmin = profile.global_role === "super_admin";
 
-  const { data: rawMemberships } = await supabase
-    .from("school_users")
-    .select("*, school:schools(*)")
-    .eq("profile_id", profile.id)
-    .eq("status", "active");
+  const cookieStore = await cookies();
+  const requested = cookieStore.get(ACTIVE_SCHOOL_COOKIE)?.value ?? null;
+
+  // The memberships and a super admin's selected school are independent
+  // reads, so they go out together rather than one after the other.
+  const [{ data: rawMemberships }, superSchool] = await Promise.all([
+    supabase
+      .from("school_users")
+      .select("*, school:schools(*)")
+      .eq("profile_id", profile.id)
+      .eq("status", "active"),
+    // A super admin may select any active school. No selection = global
+    // context, never an arbitrary school's data.
+    isSuperAdmin && requested
+      ? supabase
+          .from("schools")
+          .select("*")
+          .eq("id", requested)
+          .eq("active", true)
+          .maybeSingle<School>()
+          .then((r) => r.data ?? null)
+      : Promise.resolve(null),
+  ]);
 
   const memberships = ((rawMemberships ?? []) as (SchoolUser & { school: School })[])
     .filter((m) => m.school?.active);
 
-  const cookieStore = await cookies();
-  const requested = cookieStore.get(ACTIVE_SCHOOL_COOKIE)?.value ?? null;
-
   let activeSchool: School | null = null;
 
   if (isSuperAdmin) {
-    // A super admin may select any active school. No selection = global context,
-    // never an arbitrary school's data.
-    if (requested) {
-      const { data } = await supabase
-        .from("schools")
-        .select("*")
-        .eq("id", requested)
-        .eq("active", true)
-        .maybeSingle<School>();
-      activeSchool = data ?? null;
-    }
+    activeSchool = superSchool;
   } else {
     // A normal user may only ever be in a school they hold a membership in.
     // The cookie is authorization-checked here on every request; RLS enforces
