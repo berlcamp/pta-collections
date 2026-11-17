@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { AlertTriangle, Check, CircleDashed } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -92,7 +93,7 @@ export function SchoolSetupChecklist({ checks }: { checks: SetupCheck[] }) {
 
             {!check.done && check.href && (
               <Link
-                href={{ pathname: check.href }}
+                href={check.href as Route}
                 className="shrink-0 text-xs font-medium text-primary underline-offset-4 hover:underline"
               >
                 {check.hrefLabel ?? "Fix"}

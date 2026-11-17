@@ -17,6 +17,8 @@ import { SidebarUserMenu } from "./sidebar-user-menu";
 import { SchoolSwitcher } from "./school-switcher";
 import { ThemeToggle } from "./theme-toggle";
 import { SuperAdminBanner } from "./super-admin-banner";
+import { SetupGuideButton } from "./setup-guide-button";
+import { getSchoolSetupChecks } from "@/lib/setup/school-setup";
 
 export async function AppShell({
   session,
@@ -65,6 +67,18 @@ export async function AppShell({
     allSchools = data ?? undefined;
   }
 
+  // The setup guide is for whoever can act on it: a school admin, or a super
+  // admin operating inside the school (who resolves to admin). A treasurer or
+  // viewer could fix none of it, so they never pay for the counts.
+  let setupChecks;
+  if (activeSchool && activeRole === "admin") {
+    const supabase = await createClient();
+    const checks = await getSchoolSetupChecks(supabase, activeSchool.id, {
+      isSuperAdmin,
+    });
+    if (checks.some((c) => !c.done)) setupChecks = checks;
+  }
+
   // Read the collapse state on the server so a collapsed rail does not flash
   // open on first paint. The cookie name is the one SidebarProvider writes.
   const store = await cookies();
@@ -84,6 +98,12 @@ export async function AppShell({
           <Separator orientation="vertical" className="mr-1 h-5" />
           <AppBreadcrumbs groups={allGroups} />
           <div className="ml-auto flex min-w-0 items-center gap-2">
+            {activeSchool && setupChecks && (
+              <SetupGuideButton
+                schoolName={activeSchool.name}
+                checks={setupChecks}
+              />
+            )}
             <SchoolSwitcher session={session} allSchools={allSchools} />
             <ThemeToggle />
           </div>
