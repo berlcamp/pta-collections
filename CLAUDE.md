@@ -13,6 +13,11 @@ shared infrastructure. Treat everything outside the `pta` schema as third-party.
 - **Never run `supabase db push`, `db reset`, or `db diff` against the remote.**
   They operate on the whole database and will propose dropping the other apps' objects.
   Production migrations are applied by hand, in order, via the Supabase SQL Editor.
+- **The Supabase MCP is READ-ONLY.** `.claude/settings.json` denies its write tools
+  (`apply_migration`, branches, edge functions, notebooks, project lifecycle), and
+  `.claude/hooks/supabase-readonly.py` refuses any `execute_sql` that could write,
+  change structure, control a transaction or call a schema function. Every data or
+  schema change is a migration file the owner runs in the SQL Editor.
 - **Never add a trigger to `auth.users`.** A raising trigger there breaks signup for
   every app on the project. Provisioning is lazy, via `pta.claim_invite()`.
 - **Never create anything in `public`.** Schema `pta` only.
