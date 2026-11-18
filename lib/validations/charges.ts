@@ -24,21 +24,28 @@ export const feeTypeSchema = z.object({
 export const assessSchema = z
   .object({
     schoolYearId: dbId(),
-    feeTypeIds: z.array(dbId()).min(1, "Select at least one fee type."),
+    /** One entry per fee; a null amount means "use the fee's default" (0029). */
+    items: z
+      .array(
+        z.object({
+          feeTypeId: dbId(),
+          amount: z
+            .number()
+            .positive("Every amount must be greater than zero.")
+            .max(9_999_999.99)
+            .nullable(),
+        }),
+      )
+      .min(1, "Select at least one fee type."),
     gradeLevels: z.array(z.string().min(1)).nullable(),
     sectionIds: z.array(dbId()).nullable(),
-    amount: z
-      .number()
-      .positive("The amount must be greater than zero.")
-      .max(9_999_999.99)
-      .nullable(),
     dueDate: z.string().nullable(),
   })
   .refine((v) => !(v.gradeLevels?.length && v.sectionIds?.length), {
     message: "Choose grades or sections, not both.",
   })
-  .refine((v) => v.amount == null || new Set(v.feeTypeIds).size === 1, {
-    message: "An amount can only be set when assessing a single fee type.",
+  .refine((v) => new Set(v.items.map((i) => i.feeTypeId)).size === v.items.length, {
+    message: "A fee type is listed twice.",
   });
 
 export const penaltySchema = z.object({

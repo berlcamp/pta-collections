@@ -68,7 +68,8 @@ const formSchema = z.object({
   scope: z.enum(["all", "grades", "sections"]),
   gradeLevels: z.array(z.string()),
   sectionIds: z.array(z.string()),
-  amount: z.string(),
+  /** Typed amount per fee id; blank means "use the fee's default". */
+  amounts: z.record(z.string(), z.string()),
   dueDate: z.string(),
 });
 
@@ -103,33 +104,34 @@ export function AssessFeesForm({
       scope: "all",
       gradeLevels: [],
       sectionIds: [],
-      amount: "",
+      amounts: {},
       dueDate: "",
     },
   });
 
-  const [selected, scope, gradeLevels, sectionIds, amountText] = form.watch([
+  const [selected, scope, gradeLevels, sectionIds, amounts] = form.watch([
     "feeTypeIds",
     "scope",
     "gradeLevels",
     "sectionIds",
-    "amount",
+    "amounts",
   ]);
+  // Set once the admin picks a scope themselves, so ticking a homeroom fee
+  // only suggests Sections while they have not chosen.
+  const [scopeTouched, setScopeTouched] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
 
   const chosen = feeTypes.filter((f) => selected.includes(f.id));
-  const single = chosen.length === 1 ? chosen[0] : null;
-  const override = single && amountText.trim() !== "" ? parseMoneyInput(amountText) : null;
-  const amountOf = (f: FeeType) =>
-    override != null && override > 0 ? override : Number(f.default_amount ?? 0);
+  /** What this fee charges per student/family in this run. */
+  const amountOf = (f: FeeType) => {
+    const typed = (amounts[f.id] ?? "").trim();
+    return typed !== "" ? parseMoneyInput(typed) : Number(f.default_amount ?? 0);
+  };
+  const missing = chosen.filter((f) => !(amountOf(f) > 0));
   const studentFees = chosen.filter((f) => f.billing_basis !== "per_family");
   const familyFees = chosen.filter((f) => f.billing_basis === "per_family");
   const perStudent = studentFees.reduce((s, f) => s + amountOf(f), 0);
   const perFamily = familyFees.reduce((s, f) => s + amountOf(f), 0);
-
-  // A fee with no default can still be assessed — but only alone, and only
-  // with an amount typed in. That is the normal shape of a homeroom fee.
-  const needsAmount = Boolean(single && !(Number(single.default_amount) > 0));
-  const missingDefault = !single && chosen.some((f) => !(Number(f.default_amount) > 0));
 
   const allSections = grades.flatMap((g) =>
     g.sections.map((s) => ({ ...s, grade: g.label })),
@@ -186,9 +188,6 @@ export function AssessFeesForm({
   const scopeEmpty =
     (scope === "grades" && gradeLevels.length === 0) ||
     (scope === "sections" && sectionIds.length === 0);
-  const amountInvalid =
-    (needsAmount && !(override != null && override > 0)) ||
-    (override != null && !(override > 0));
 
   /**
    * Submitting does not assess: it validates, then opens the confirmation.
@@ -200,12 +199,9 @@ export function AssessFeesForm({
       toast.error(scope === "grades" ? "Pick at least one grade." : "Pick at least one section.");
       return;
     }
-    if (missingDefault) {
-      toast.error("A fee with no default amount has to be assessed on its own, with an amount.");
-      return;
-    }
-    if (amountInvalid) {
-      form.setError("amount", { message: "Enter an amount greater than zero." });
+    if (missing.length > 0) {
+      setShowErrors(true);
+      toast.error(`Enter an amount for ${missing.map((f) => f.name).join(", ")}.`);
       return;
     }
     setConfirmOpen(true);
@@ -216,10 +212,13 @@ export function AssessFeesForm({
     startTransition(async () => {
       const res = await assessAnnualFees({
         schoolYearId: v.schoolYearId,
-        feeTypeIds: v.feeTypeIds,
+        items: chosen.map((f) => ({
+          feeTypeId: f.id,
+          // Sent only when typed, so "use the default" stays the server's call.
+          amount: (v.amounts[f.id] ?? "").trim() !== "" ? amountOf(f) : null,
+        })),
         gradeLevels: v.scope === "grades" ? v.gradeLevels : null,
         sectionIds: v.scope === "sections" ? v.sectionIds : null,
-        amount: override != null && override > 0 ? override : null,
         dueDate: v.dueDate || null,
       });
       setConfirmOpen(false);
@@ -300,8 +299,9 @@ export function AssessFeesForm({
           <CardHeader>
             <CardTitle>2. Fee types</CardTitle>
             <CardDescription>
-              A fee with no default amount — usually a homeroom contribution — is
-              assessed on its own, and you type its amount below.
+              Tick the fees to charge. Each one&apos;s amount can be changed for this
+              run; a fee with no default — usually a homeroom contribution — needs
+              one typed in.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -320,44 +320,75 @@ export function AssessFeesForm({
                       {feeTypes.map((f) => {
                         const checked = field.value.includes(f.id);
                         const hasDefault = Number(f.default_amount) > 0;
+                        const invalid = checked && showErrors && !(amountOf(f) > 0);
                         return (
-                          <label
+                          <div
                             key={f.id}
-                            className="flex cursor-pointer items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/50"
+                            className={cn(
+                              "flex flex-wrap items-center gap-3 px-3 py-3 transition-colors sm:flex-nowrap",
+                              checked && "bg-muted/40",
+                            )}
                           >
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(v) =>
-                                field.onChange(toggle(field.value, f.id, Boolean(v)))
-                              }
-                            />
-                            <span className="flex-1 text-sm font-medium">
-                              {f.name}
-                              {f.billing_basis === "per_family" && (
-                                <Badge variant="outline" className="ml-2 align-middle">
-                                  Once per family
-                                </Badge>
-                              )}
-                              {f.category === "homeroom" && (
-                                <Badge variant="secondary" className="ml-2 align-middle">
-                                  Homeroom
-                                </Badge>
-                              )}
-                              {f.description && (
-                                <span className="block text-xs font-normal text-muted-foreground">
-                                  {f.description}
-                                </span>
-                              )}
-                            </span>
-                            <span
-                              className={cn(
-                                "font-mono text-sm tabular-nums",
-                                !hasDefault && "text-xs text-muted-foreground",
-                              )}
-                            >
-                              {hasDefault ? formatMoney(f.default_amount) : "Set amount"}
-                            </span>
-                          </label>
+                            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => {
+                                  field.onChange(toggle(field.value, f.id, Boolean(v)));
+                                  // A homeroom fee is almost always for one room.
+                                  if (v && f.category === "homeroom" && !scopeTouched) {
+                                    form.setValue("scope", "sections");
+                                  }
+                                }}
+                              />
+                              <span className="min-w-0 flex-1 text-sm font-medium">
+                                {f.name}
+                                {f.billing_basis === "per_family" && (
+                                  <Badge variant="outline" className="ml-2 align-middle">
+                                    Once per family
+                                  </Badge>
+                                )}
+                                {f.category === "homeroom" && (
+                                  <Badge variant="secondary" className="ml-2 align-middle">
+                                    Homeroom
+                                  </Badge>
+                                )}
+                                {f.description && (
+                                  <span className="block text-xs font-normal text-muted-foreground">
+                                    {f.description}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                            {checked ? (
+                              <div className="ml-7 flex items-center gap-1.5 sm:ml-0">
+                                <span className="text-sm text-muted-foreground">₱</span>
+                                <Input
+                                  aria-label={`Amount for ${f.name}`}
+                                  aria-invalid={invalid || undefined}
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  placeholder={hasDefault ? Number(f.default_amount).toFixed(2) : "Amount"}
+                                  className={cn(
+                                    "h-9 w-32 text-right font-mono tabular-nums",
+                                    invalid && "border-destructive ring-1 ring-destructive",
+                                  )}
+                                  value={amounts[f.id] ?? ""}
+                                  onChange={(e) =>
+                                    form.setValue(`amounts.${f.id}`, e.target.value)
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <span
+                                className={cn(
+                                  "font-mono text-sm tabular-nums",
+                                  !hasDefault && "text-xs text-muted-foreground",
+                                )}
+                              >
+                                {hasDefault ? formatMoney(f.default_amount) : "Set amount"}
+                              </span>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -367,41 +398,9 @@ export function AssessFeesForm({
               )}
             />
 
-            {single && (
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>
-                      Amount per student
-                      {!needsAmount && (
-                        <span className="font-normal text-muted-foreground">
-                          {" "}
-                          (optional — blank uses {formatMoney(single.default_amount)})
-                        </span>
-                      )}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        className="w-48 font-mono"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Each room can carry its own amount: assess Rizal at ₱200, then
-                      Mabini at ₱150, under the same fee.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            {missingDefault && (
+            {showErrors && missing.length > 0 && (
               <p className="mt-3 text-sm text-destructive">
-                A fee marked “Set amount” has to be assessed on its own.
+                Enter an amount for {missing.map((f) => f.name).join(", ")}.
               </p>
             )}
           </CardContent>
@@ -437,7 +436,10 @@ export function AssessFeesForm({
                         type="button"
                         role="radio"
                         aria-checked={field.value === value}
-                        onClick={() => field.onChange(value)}
+                        onClick={() => {
+                          setScopeTouched(true);
+                          field.onChange(value);
+                        }}
                         className={cn(
                           "h-9 rounded-md px-4 text-sm font-medium transition-colors",
                           field.value === value

@@ -66,13 +66,12 @@ export async function assessAnnualFees(
   const v = parsed.data;
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("assess_fees_scoped", {
+  const { data, error } = await supabase.rpc("assess_fees", {
     p_school_id: ctx.activeSchool.id,
     p_school_year_id: v.schoolYearId,
-    p_fee_type_ids: v.feeTypeIds,
+    p_items: v.items.map((i) => ({ fee_type_id: i.feeTypeId, amount: i.amount })),
     p_grade_levels: v.gradeLevels?.length ? v.gradeLevels : null,
     p_section_ids: v.sectionIds?.length ? v.sectionIds : null,
-    p_amount: v.amount,
     p_due_date: v.dueDate,
   });
 

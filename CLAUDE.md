@@ -411,11 +411,14 @@ reads `pta.v_section_charge_summary`.
   cashier, same portal, same receipt series. It is not a donation.
 - **The scope is resolved in SQL** from `student_enrollments`. The browser names
   grades or sections, never a student list.
-- **The amount override is single-fee only**, so one "Homeroom contribution" fee
-  type can be ₱200 in Rizal and ₱150 in Mabini. Re-assessing keeps the first
-  charge at its first amount. A wrong amount is cancelled and re-assessed, never
-  repriced in place.
-- `assess_annual_fees()` is left as applied history. The app no longer calls it.
+- **Each fee carries its own amount for the run** (`pta.assess_fees()`, 0029:
+  `p_items = [{fee_type_id, amount}]`, null = default). That is how one "Homeroom
+  contribution" fee type is ₱200 in Rizal and ₱150 in Mabini. A fee with no
+  default and no amount is refused by name. Re-assessing keeps the first charge
+  at its first amount. A wrong amount is cancelled and re-assessed, never repriced
+  in place.
+- `assess_annual_fees()` and `assess_fees_scoped()` are left as applied history.
+  The app calls only `assess_fees()`.
 
 ### One parent RECORD per person: siblings are a family only through it
 `0027_guardian_merge.sql`. Students → Parents (`/students/parents`) lists
