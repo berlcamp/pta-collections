@@ -9,7 +9,11 @@ import {
   newStudentSchema,
 } from "@/lib/validations/students";
 import { normalizeContact } from "@/lib/utils/names";
-import { searchGuardians, type GuardianSearchResult } from "@/lib/data/guardians";
+import {
+  findGuardiansByContact,
+  searchGuardians,
+  type GuardianSearchResult,
+} from "@/lib/data/guardians";
 import type { ActionResult } from "./types";
 
 /**
@@ -30,6 +34,25 @@ export async function findGuardians(
     schoolId: ctx.activeSchool.id,
     query,
     limit: 8,
+  });
+  return { ok: true, data: rows };
+}
+
+/**
+ * Mobile-number lookup, the first step of the parent block on /students/new.
+ * Returns every parent on file with that number and the children they are
+ * already linked to, so the office links the family instead of retyping it.
+ */
+export async function findGuardiansByPhone(
+  contact: string,
+): Promise<ActionResult<GuardianSearchResult[]>> {
+  const ctx = await requireSchool();
+  if (!can(ctx.activeRole, "manageStudents")) {
+    return { ok: false, error: "Only an administrator can look up guardians." };
+  }
+  const rows = await findGuardiansByContact({
+    schoolId: ctx.activeSchool.id,
+    contact: String(contact ?? "").slice(0, 40),
   });
   return { ok: true, data: rows };
 }

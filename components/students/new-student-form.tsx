@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, UserRound, X } from "lucide-react";
+import { Link2, Loader2, Phone, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -36,11 +36,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { newStudentSchema, type NewStudentInput } from "@/lib/validations/students";
-import { createStudent } from "@/app/actions/students";
+import { createStudent, findGuardiansByPhone } from "@/app/actions/students";
 import { GuardianPicker } from "@/components/students/guardian-picker";
 import { RELATIONSHIPS } from "@/lib/import/parse";
 import type { GuardianSearchResult } from "@/lib/data/guardians";
 import type { GradeLevel, Section } from "@/types/database.types";
+
+type Relationship = NewStudentInput["guardian"]["relationship"];
 
 const NONE = "__none__";
 
@@ -48,15 +50,28 @@ export function NewStudentForm({
   schoolYearId,
   gradeLevels,
   sections,
+  sibling,
 }: {
   schoolYearId: string;
   gradeLevels: GradeLevel[];
   sections: Section[];
+  /** "Add sibling": the family this student joins, pre-linked. */
+  sibling?: {
+    name: string;
+    lastName: string;
+    guardian: GuardianSearchResult | null;
+    relationship: Relationship;
+  } | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Set when the guardian is an existing record rather than one being typed.
-  const [linked, setLinked] = useState<GuardianSearchResult | null>(null);
+  const [linked, setLinked] = useState<GuardianSearchResult | null>(
+    sibling?.guardian ?? null,
+  );
+  // Parents already on file with the number being typed.
+  const [phoneMatches, setPhoneMatches] = useState<GuardianSearchResult[]>([]);
+  const [lookingUp, setLookingUp] = useState(false);
 
   const form = useForm<NewStudentInput>({
     resolver: zodResolver(newStudentSchema),
@@ -66,25 +81,26 @@ export function NewStudentForm({
       lrn: "",
       first_name: "",
       middle_name: "",
-      last_name: "",
+      last_name: sibling?.lastName ?? "",
       suffix: "",
       birth_date: "",
       grade_level: gradeLevels[0]?.code ?? "Grade 7",
       section_id: null,
       student_number: "",
       guardian: {
-        guardian_id: null,
-        first_name: "",
-        last_name: "",
-        contact_number: "",
-        email: "",
-        relationship: "Mother",
+        guardian_id: sibling?.guardian?.id ?? null,
+        first_name: sibling?.guardian?.first_name ?? "",
+        last_name: sibling?.guardian?.last_name ?? "",
+        contact_number: sibling?.guardian?.contact_number ?? "",
+        email: sibling?.guardian?.email ?? "",
+        relationship: sibling?.relationship ?? "Mother",
       },
     },
   });
 
   function linkGuardian(g: GuardianSearchResult) {
     setLinked(g);
+    setPhoneMatches([]);
     form.setValue("guardian.guardian_id", g.id);
     form.setValue("guardian.first_name", g.first_name);
     form.setValue("guardian.last_name", g.last_name);
@@ -101,6 +117,29 @@ export function NewStudentForm({
     form.setValue("guardian.contact_number", "");
     form.setValue("guardian.email", "");
   }
+
+  // The number is asked first, and looked up as soon as it is a whole one:
+  // a parent already on file is linked, not typed in a second time.
+  const contact = form.watch("guardian.contact_number") ?? "";
+  const digits = contact.replace(/\D/g, "");
+  useEffect(() => {
+    if (linked || digits.length < 10) {
+      setPhoneMatches([]);
+      return;
+    }
+    let live = true;
+    const t = setTimeout(async () => {
+      setLookingUp(true);
+      const res = await findGuardiansByPhone(digits);
+      if (!live) return;
+      setLookingUp(false);
+      setPhoneMatches(res.ok ? res.data : []);
+    }, 350);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [digits, linked]);
 
   const gradeLevel = form.watch("grade_level");
   const sectionsForGrade = sections.filter((s) => s.grade_level === gradeLevel);
@@ -134,6 +173,19 @@ export function NewStudentForm({
         noValidate
         className="max-w-3xl space-y-4"
       >
+        {sibling && (
+          <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+            <Link2 className="mt-0.5 size-4 shrink-0 text-primary" />
+            <p className="text-pretty">
+              Adding a brother or sister of{" "}
+              <strong className="font-semibold">{sibling.name}</strong>.{" "}
+              {sibling.guardian
+                ? "Their parent is already linked below, so the two are one family."
+                : "They have no parent on file yet — add one below and link it to both."}
+            </p>
+          </div>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Student</CardTitle>
@@ -374,9 +426,9 @@ export function NewStudentForm({
           <CardHeader>
             <CardTitle>Parent / Guardian</CardTitle>
             <CardDescription>
-              One guardian per student — the contact for collection notices. If
-              a sibling is already enrolled, link that same guardian rather than
-              typing them in again.
+              One guardian per student — the contact for collection notices.
+              Siblings share one parent record: that is how the school knows
+              they are one family.
             </CardDescription>
             <CardAction>
               <GuardianPicker onSelect={linkGuardian} disabled={pending} />
@@ -402,11 +454,9 @@ export function NewStudentForm({
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    {linked.student_count === 0
+                    {linked.children.length === 0
                       ? "Not linked to any student yet."
-                      : `Already the guardian of ${linked.student_count} other ${
-                          linked.student_count === 1 ? "student" : "students"
-                        }.`}
+                      : `Already the parent of ${linked.children.join(", ")}.`}
                   </p>
                 </div>
                 <Button
@@ -422,6 +472,75 @@ export function NewStudentForm({
               </div>
             ) : (
               <>
+                <FormField
+                  control={form.control}
+                  name="guardian.contact_number"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Mobile number</FormLabel>
+                      <FormControl>
+                        <div className="relative max-w-xs">
+                          <Phone className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            inputMode="tel"
+                            placeholder="09171234567"
+                            autoComplete="off"
+                            className="pl-9 font-mono"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                          {lookingUp && (
+                            <Loader2 className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Start here. If this parent is already on file — a brother or
+                        sister is enrolled — they show up below to link.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {phoneMatches.length > 0 && (
+                  <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:col-span-2">
+                    <p className="text-sm font-medium">
+                      Already on file with this number
+                    </p>
+                    {phoneMatches.map((g) => (
+                      <div
+                        key={g.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            {g.first_name} {g.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {g.children.length === 0
+                              ? "No children linked yet"
+                              : `Parent of ${g.children.join(", ")}`}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => linkGuardian(g)}
+                          disabled={pending}
+                        >
+                          <Link2 className="size-3.5" />
+                          Link this parent
+                        </Button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      A different person who shares this phone? Type their name
+                      below instead.
+                    </p>
+                  </div>
+                )}
+
                 <FormField
                   control={form.control}
                   name="guardian.first_name"
@@ -444,26 +563,6 @@ export function NewStudentForm({
                       <FormLabel>Last name</FormLabel>
                       <FormControl>
                         <Input autoComplete="off" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="guardian.contact_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Contact number</FormLabel>
-                      <FormControl>
-                        <Input
-                          inputMode="tel"
-                          placeholder="09171234567"
-                          className="font-mono"
-                          {...field}
-                          value={field.value ?? ""}
-                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

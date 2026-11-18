@@ -9,6 +9,7 @@ import {
   LogOut,
   Receipt,
   ScanLine,
+  UserPlus,
   Users,
   Wallet,
 } from "lucide-react";
@@ -124,6 +125,16 @@ export default async function StudentProfilePage({
         actions={
           <>
             <SchoolYearPicker years={schoolYears} current={schoolYear.id} />
+            {can(ctx.activeRole, "manageStudents") && (
+              // Same parent, pre-linked: the fastest way to register a family
+              // as one, and the one that cannot fork its parent record.
+              <Button asChild variant="outline">
+                <Link href={`/students/new?sibling=${student.id}`}>
+                  <UserPlus className="size-4" />
+                  Add sibling
+                </Link>
+              </Button>
+            )}
             {can(ctx.activeRole, "recordPayment") && outstanding.length > 0 && (
               <Button asChild>
                 <Link href={`/collections/new?student=${student.id}`}>
