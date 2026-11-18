@@ -11,6 +11,7 @@ export const feeTypeSchema = z.object({
     .nonnegative("Amount cannot be negative.")
     .max(9_999_999.99)
     .nullable(),
+  billing_basis: z.enum(["per_student", "per_family"]),
   is_recurring: z.boolean(),
   active: z.boolean(),
 });

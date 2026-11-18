@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,7 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatMoney, parseMoneyInput } from "@/lib/financial/money";
-import { assessAnnualFees } from "@/app/actions/charges";
+import { assessAnnualFees, previewAssessScope } from "@/app/actions/charges";
 import { dynamicRoute } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import type { FeeType, SchoolYear } from "@/types/database.types";
@@ -119,10 +119,12 @@ export function AssessFeesForm({
   const chosen = feeTypes.filter((f) => selected.includes(f.id));
   const single = chosen.length === 1 ? chosen[0] : null;
   const override = single && amountText.trim() !== "" ? parseMoneyInput(amountText) : null;
-  const perStudent =
-    override != null && override > 0
-      ? override
-      : chosen.reduce((s, f) => s + Number(f.default_amount ?? 0), 0);
+  const amountOf = (f: FeeType) =>
+    override != null && override > 0 ? override : Number(f.default_amount ?? 0);
+  const studentFees = chosen.filter((f) => f.billing_basis !== "per_family");
+  const familyFees = chosen.filter((f) => f.billing_basis === "per_family");
+  const perStudent = studentFees.reduce((s, f) => s + amountOf(f), 0);
+  const perFamily = familyFees.reduce((s, f) => s + amountOf(f), 0);
 
   // A fee with no default can still be assessed — but only alone, and only
   // with an amount typed in. That is the normal shape of a homeroom fee.
@@ -142,6 +144,31 @@ export function AssessFeesForm({
         : allSections
             .filter((s) => sectionIds.includes(s.id))
             .reduce((s, x) => s + x.count, 0);
+
+  // Families are computed in SQL (pta.student_families, 0028) — the same
+  // function the assessment uses, so the preview cannot disagree with it.
+  const [families, setFamilies] = useState<number | null>(null);
+  const scopeKey = `${scope}|${gradeLevels.join(",")}|${sectionIds.join(",")}`;
+  const wantsFamilies = familyFees.length > 0;
+  const yearId = form.watch("schoolYearId");
+  useEffect(() => {
+    if (!wantsFamilies) return;
+    let live = true;
+    setFamilies(null);
+    const [sc, g, sec] = scopeKey.split("|");
+    void previewAssessScope({
+      schoolYearId: yearId,
+      gradeLevels: sc === "grades" && g ? g.split(",") : null,
+      sectionIds: sc === "sections" && sec ? sec.split(",") : null,
+    }).then((res) => {
+      if (live && res.ok) setFamilies(res.data.families);
+    });
+    return () => {
+      live = false;
+    };
+  }, [scopeKey, wantsFamilies, yearId]);
+  const familyCount = families ?? 0;
+  const grandTotal = perStudent * targetCount + perFamily * familyCount;
 
   const scopeLabel =
     scope === "all"
@@ -306,6 +333,11 @@ export function AssessFeesForm({
                             />
                             <span className="flex-1 text-sm font-medium">
                               {f.name}
+                              {f.billing_basis === "per_family" && (
+                                <Badge variant="outline" className="ml-2 align-middle">
+                                  Once per family
+                                </Badge>
+                              )}
                               {f.category === "homeroom" && (
                                 <Badge variant="secondary" className="ml-2 align-middle">
                                   Homeroom
@@ -528,16 +560,28 @@ export function AssessFeesForm({
 
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-4">
-            <div className="text-sm">
-              <p>
-                <span className="font-semibold">{targetCount.toLocaleString()}</span>{" "}
-                student{targetCount === 1 ? "" : "s"} &times;{" "}
-                <span className="font-semibold">{chosen.length}</span> fee
-                {chosen.length === 1 ? "" : "s"}
-              </p>
+            <div className="space-y-0.5 text-sm">
+              {(studentFees.length > 0 || familyFees.length === 0) && (
+                <p>
+                  <span className="font-semibold">{targetCount.toLocaleString()}</span>{" "}
+                  student{targetCount === 1 ? "" : "s"} &times;{" "}
+                  {formatMoney(perStudent)}
+                </p>
+              )}
+              {familyFees.length > 0 && (
+                <p>
+                  <span className="font-semibold">
+                    {families == null ? "…" : familyCount.toLocaleString()}
+                  </span>{" "}
+                  famil{familyCount === 1 ? "y" : "ies"} &times; {formatMoney(perFamily)}
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · eldest child only, out of {targetCount.toLocaleString()} students
+                  </span>
+                </p>
+              )}
               <p className="text-muted-foreground">
-                {formatMoney(perStudent)} per student ·{" "}
-                {formatMoney(perStudent * targetCount)} total if none exist yet
+                {formatMoney(grandTotal)} total if none exist yet
               </p>
             </div>
             <Button
@@ -571,10 +615,15 @@ export function AssessFeesForm({
                 {targetCount === 1 ? "" : "s"}?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                This charges {scopeLabel} {chosen.length} fee
-                {chosen.length === 1 ? "" : "s"}, worth {formatMoney(perStudent)} per
-                student. Students who already have these charges are skipped — and
-                keep their existing amount.
+                This charges {scopeLabel}
+                {studentFees.length > 0 &&
+                  ` ${formatMoney(perStudent)} per student`}
+                {studentFees.length > 0 && familyFees.length > 0 && " and"}
+                {familyFees.length > 0 &&
+                  ` ${formatMoney(perFamily)} per family, on the eldest child`}
+                . Anyone already charged is skipped and keeps their existing
+                amount; a family already charged through any child is not charged
+                again.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -12,6 +12,7 @@ export type MembershipStatus = "active" | "inactive";
 export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
 export type FeeCategory = "annual" | "penalty" | "special" | "other" | "homeroom";
 export type ChargeStatus = "active" | "waived" | "cancelled";
+export type BillingBasis = "per_student" | "per_family";
 export type DerivedPaymentStatus =
   | "unpaid"
   | "partially_paid"
@@ -214,6 +215,8 @@ export interface FeeType {
   description: string | null;
   category: FeeCategory;
   default_amount: number | null;
+  /** 0028: charged to every student, or once per family on the eldest. */
+  billing_basis: BillingBasis;
   is_recurring: boolean;
   active: boolean;
   created_at: string;

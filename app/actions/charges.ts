@@ -11,6 +11,8 @@ import {
   penaltySchema,
   waiveSchema,
 } from "@/lib/validations/charges";
+import { z } from "zod";
+import { dbId } from "@/lib/validations/id";
 import type { ActionResult } from "./types";
 
 export async function saveFeeType(input: unknown): Promise<ActionResult> {
@@ -89,6 +91,40 @@ export async function assessAnnualFees(
       created: Number(row?.created_count ?? 0),
       skipped: Number(row?.skipped_count ?? 0),
     },
+  };
+}
+
+const previewSchema = z.object({
+  schoolYearId: dbId(),
+  gradeLevels: z.array(z.string().min(1)).nullable(),
+  sectionIds: z.array(dbId()).nullable(),
+});
+
+/** Students and families in an assessment scope — the Assess screen's preview. */
+export async function previewAssessScope(
+  input: unknown,
+): Promise<ActionResult<{ students: number; families: number }>> {
+  const ctx = await requireSchool();
+  if (!can(ctx.activeRole, "assessFees")) {
+    return { ok: false, error: "Only an administrator can assess fees." };
+  }
+  const parsed = previewSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid scope." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("assessment_scope_count", {
+    p_school_id: ctx.activeSchool.id,
+    p_school_year_id: parsed.data.schoolYearId,
+    p_grade_levels: parsed.data.gradeLevels,
+    p_section_ids: parsed.data.sectionIds,
+  });
+  if (error) return { ok: false, error: error.message };
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { student_count: number; family_count: number }
+    | undefined;
+  return {
+    ok: true,
+    data: { students: Number(row?.student_count ?? 0), families: Number(row?.family_count ?? 0) },
   };
 }
 

@@ -436,6 +436,20 @@ reads `pta.v_section_charge_summary`.
 - "Not the same person" goes in `guardian_duplicate_dismissals`, one row per
   unordered pair (`guardian_a < guardian_b`).
 
+### A per-family fee is charged once, to the eldest
+`0028_family_fees.sql` adds `fee_types.billing_basis` (`per_student` | `per_family`)
+and redefines `assess_fees_scoped()`.
+
+- **A family is students connected through ANY shared guardian, transitively.**
+  `pta.student_families()` is the only definition. The Assess preview
+  (`assessment_scope_count()`) and the assessment both call it.
+- **The eldest is the highest grade, then the earliest birth date**, because
+  birth_date is often blank. Only an `enrolled` student carries the charge.
+- **A family is skipped if ANY member holds a live charge** of that fee for that
+  year. Re-runs, late siblings and transfers never charge it twice; a cancelled
+  charge doesn't count.
+- **Duplicate parent records split a family**, so merge them (0027) first.
+
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through
   `SECURITY DEFINER` RPCs in `pta`. Never write `payments` or `donations` from

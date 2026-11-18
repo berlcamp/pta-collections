@@ -72,6 +72,7 @@ const formSchema = z
         "Enter an amount, or leave it blank for no default.",
       ),
     description: z.string().trim().max(500),
+    billing_basis: z.enum(["per_student", "per_family"]),
     is_recurring: z.boolean(),
     active: z.boolean(),
   })
@@ -131,6 +132,7 @@ function defaultsFor(feeType: FeeType | null): FeeTypeValues {
     default_amount:
       feeType?.default_amount != null ? String(feeType.default_amount) : "",
     description: feeType?.description ?? "",
+    billing_basis: feeType?.billing_basis ?? "per_student",
     is_recurring: feeType?.is_recurring ?? false,
     active: feeType?.active ?? true,
   };
@@ -174,6 +176,7 @@ function FeeTypeDialog({
         default_amount: values.default_amount
           ? parseMoneyInput(values.default_amount)
           : null,
+        billing_basis: values.billing_basis,
         is_recurring: values.is_recurring,
         active: values.active,
       });
@@ -280,6 +283,37 @@ function FeeTypeDialog({
                     </FormControl>
                     <FormDescription>
                       Used when assessing this fee.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="billing_basis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Charged</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-full min-w-0">
+                          <SelectValue>
+                            {field.value === "per_family"
+                              ? "Once per family"
+                              : "To every student"}
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="per_student">To every student</SelectItem>
+                        <SelectItem value="per_family">Once per family</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      {field.value === "per_family"
+                        ? "Charged to the eldest child only. Brothers and sisters — children sharing a parent on file — are not charged."
+                        : "Each enrolled student gets their own charge."}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

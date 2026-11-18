@@ -68,6 +68,18 @@ export function FeeTypesTable({
       ),
     },
     {
+      id: "billing_basis",
+      accessorFn: (r) => (r.billing_basis === "per_family" ? "Per family" : "Per student"),
+      meta: { label: "Charged" },
+      header: ({ column }) => <SortableHeader column={column} title="Charged" />,
+      cell: ({ row }) =>
+        row.original.billing_basis === "per_family" ? (
+          <Badge variant="secondary">Per family</Badge>
+        ) : (
+          <span className="text-muted-foreground">Per student</span>
+        ),
+    },
+    {
       id: "is_recurring",
       accessorFn: (r) => (r.is_recurring ? "Yes" : "No"),
       meta: { label: "Recurring" },
