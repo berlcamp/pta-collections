@@ -11,8 +11,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { portalCard } from "@/components/portal/styles";
 import { createScanBuffer } from "@/lib/cashier/scan-buffer";
 import {
   findGuardianByCard,
@@ -259,13 +259,13 @@ export function CollectDesk({
     <div className={cn(idle && "mx-auto max-w-xl pt-[8vh]")}>
       {idle && (
         <div className="mb-8 text-center">
-          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-accent text-primary">
-            <ScanLine className="size-7" aria-hidden />
+          <span className="portal-cta mx-auto grid size-18 place-items-center rounded-[1.75rem] text-white shadow-xl shadow-blue-900/25">
+            <ScanLine className="size-9" aria-hidden />
           </span>
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight">
+          <h1 className="mt-6 text-[1.75rem] font-semibold tracking-tight text-slate-900">
             Scan a parent card
           </h1>
-          <p className="mt-1.5 text-muted-foreground">
+          <p className="mt-1.5 text-slate-500">
             No card? Type the parent&rsquo;s or the student&rsquo;s name.
           </p>
         </div>
@@ -275,12 +275,12 @@ export function CollectDesk({
         <div className="relative flex-1">
           {searching || view.kind === "loading" ? (
             <Loader2
-              className="absolute top-1/2 left-4 size-5 -translate-y-1/2 animate-spin text-muted-foreground motion-reduce:animate-none"
+              className="absolute top-1/2 left-5 z-10 size-5 -translate-y-1/2 animate-spin text-blue-600 motion-reduce:animate-none"
               aria-hidden
             />
           ) : (
             <Search
-              className="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
+              className="absolute top-1/2 left-5 z-10 size-5 -translate-y-1/2 text-slate-400"
               aria-hidden
             />
           )}
@@ -306,7 +306,10 @@ export function CollectDesk({
             placeholder={
               idle ? "Scan card or search name" : "Scan the next card or search name"
             }
-            className={cn("bg-card pl-12 text-base", idle ? "h-14 rounded-xl" : "h-11")}
+            className={cn(
+              "rounded-2xl border-slate-200 bg-white pl-13 shadow-sm focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-500/15",
+              idle ? "h-16 text-lg" : "h-12 text-base",
+            )}
           />
 
           {open && (
@@ -314,7 +317,7 @@ export function CollectDesk({
               id="cashier-results"
               role="listbox"
               aria-label="Matching parents and students"
-              className="absolute inset-x-0 top-full z-20 mt-2 max-h-[60vh] overflow-y-auto rounded-xl border bg-popover p-1 shadow-lg"
+              className="absolute inset-x-0 top-full z-20 mt-2 max-h-[60vh] overflow-y-auto rounded-2xl bg-white p-1.5 shadow-2xl shadow-blue-950/15 ring-1 ring-slate-900/10"
             >
               {visibleHits.map((hit, i) => (
                 <HitRow
@@ -340,16 +343,20 @@ export function CollectDesk({
         </div>
 
         {!idle && !locked && (
-          <Button variant="outline" className="h-11" onClick={reset}>
+          <button
+            type="button"
+            onClick={reset}
+            className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-2xl bg-white px-5 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-900/10 transition-colors hover:bg-slate-50 focus-visible:ring-4 focus-visible:ring-blue-200 focus-visible:outline-none"
+          >
             <X className="size-4" aria-hidden />
             Clear
-          </Button>
+          </button>
         )}
       </div>
 
       <div aria-live="polite">
         {notice && (
-          <p className="mt-3 mb-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive">
+          <p className="mt-3 mb-4 flex items-start gap-2 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-red-200">
             <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
             {notice}
           </p>
@@ -360,8 +367,10 @@ export function CollectDesk({
         <>
           <p
             className={cn(
-              "mt-3 flex items-center justify-center gap-2 text-sm",
-              windowActive ? "text-muted-foreground" : "font-medium text-destructive",
+              "mx-auto mt-4 flex w-fit items-center justify-center gap-2 rounded-full px-4 py-1.5 text-sm ring-1",
+              windowActive
+                ? "bg-white text-slate-600 ring-slate-900/10"
+                : "bg-red-50 font-medium text-red-700 ring-red-200",
             )}
           >
             <span
@@ -374,25 +383,28 @@ export function CollectDesk({
             {windowActive ? "Ready to scan" : "Click here before scanning"}
           </p>
 
-          <section aria-label="Your collections today" className="mt-12">
-            <div className="flex items-baseline justify-between gap-3 border-b pb-3">
-              <p className="text-sm text-muted-foreground">
+          <section
+            aria-label="Your collections today"
+            className={cn(portalCard, "mt-12 overflow-hidden")}
+          >
+            <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-5 py-4">
+              <p className="text-sm text-slate-500">
                 Collected today &middot; {todayReceipts}{" "}
                 {todayReceipts === 1 ? "receipt" : "receipts"}
               </p>
-              <p className="text-lg font-semibold tabular-nums">
+              <p className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
                 {formatMoney(todayTotal)}
               </p>
             </div>
             {recent.length > 0 && (
-              <ul className="divide-y">
+              <ul className="divide-y divide-slate-100">
                 {recent.map((r) => (
                   <li key={r.id}>
                     <a
                       href={`/print/receipt/${r.id}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex min-h-11 items-center gap-3 py-2 text-sm hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      className="flex min-h-12 items-center gap-3 px-5 py-2 text-sm hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none"
                     >
                       <span className="min-w-0 flex-1 truncate">{r.studentName}</span>
                       <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
@@ -406,10 +418,10 @@ export function CollectDesk({
                 ))}
               </ul>
             )}
-            <div className="mt-3 text-right">
+            <div className="border-t border-slate-100 px-5 py-3 text-right">
               <Link
                 href="/cashier/report"
-                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                className="text-sm font-medium text-blue-700 underline-offset-4 hover:underline"
               >
                 Open collection report
               </Link>
@@ -466,11 +478,13 @@ function HitRow({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onPick}
       className={cn(
-        "flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
-        active ? "bg-accent" : "hover:bg-muted",
+        "flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors",
+        active ? "bg-blue-50" : "hover:bg-slate-50",
       )}
     >
-      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+        <Icon className="size-4" aria-hidden />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{hit.name}</span>
         {detail && (

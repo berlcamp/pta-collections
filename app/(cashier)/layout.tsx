@@ -1,3 +1,5 @@
+import { ScanLine } from "lucide-react";
+
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { CashierNav } from "@/components/cashier/cashier-nav";
@@ -10,6 +12,11 @@ export const dynamic = "force-dynamic";
 /**
  * The cashier's workspace: a top bar and three pages, with none of the sidebar,
  * modules or theme toggle the rest of the staff app carries.
+ *
+ * Drawn in the parent portal's look — the blue gradient behind everything, the
+ * bar sitting straight on it, the work on one pale rounded panel — because the
+ * desk is the other end of the same transaction: a parent pays at the portal
+ * or at this counter, and both should feel like the same school's app.
  *
  * Every role that can take money may open it. Only a cashier is sent here and
  * kept here, by app/(app)/layout.tsx. The role check below keeps a viewer out,
@@ -30,22 +37,38 @@ export default async function CashierLayout({
     .eq("status", "submitted");
 
   return (
-    <div className="flex min-h-svh flex-col bg-background">
-      <header className="sticky top-0 z-30 border-b bg-card">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 sm:px-6">
-          <SchoolSwitcher session={session} />
+    <div className="cashier-page flex min-h-svh flex-col text-slate-900">
+      <header className="text-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-4 pt-4 pb-5 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-blue-700 shadow-lg shadow-blue-950/30">
+              <ScanLine className="size-6" aria-hidden />
+            </span>
+            {/* The switcher is the staff app's own control, drawn for a light
+                surface, so it sits in a white chip rather than being restyled. */}
+            <div className="min-w-0 rounded-2xl bg-white px-2 py-1 text-slate-900 shadow-lg shadow-blue-950/20 [&_button]:border-0 [&_button]:bg-transparent [&_button]:shadow-none">
+              <SchoolSwitcher session={session} />
+            </div>
+          </div>
+
           <CashierNav pendingClaims={count ?? 0} />
-          <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-sm text-muted-foreground md:inline">
+
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-sm font-medium text-blue-100 md:inline">
               {session.profile.full_name}
             </span>
-            <SignOutButton variant="ghost" />
+            <SignOutButton
+              variant="ghost"
+              className="h-11 rounded-full bg-white/12 px-4 text-white ring-1 ring-white/20 hover:bg-white/20 hover:text-white"
+            />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
-        {children}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 pb-8 sm:px-6">
+        <div className="portal-sheet min-h-[calc(100svh-7rem)] rounded-[2rem] p-4 shadow-2xl shadow-blue-950/30 sm:p-8">
+          {children}
+        </div>
       </main>
     </div>
   );

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { portalButton, portalCard } from "@/components/portal/styles";
 import { createPayment } from "@/app/actions/payments";
 import { ConfirmPaymentDialog } from "@/components/collections/confirm-payment-dialog";
 import {
@@ -214,9 +215,9 @@ export function HouseholdPayment({
       )}
     >
       <div className="min-w-0 space-y-4">
-        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <header className="portal-gradient flex flex-wrap items-end justify-between gap-x-6 gap-y-3 rounded-3xl p-5 text-white shadow-lg shadow-blue-900/20 sm:p-6">
           <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-sm text-blue-100">
               {viaCard && <CreditCard className="size-3.5" aria-hidden />}
               {household.kind === "parent"
                 ? viaCard
@@ -227,7 +228,7 @@ export function HouseholdPayment({
             <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-balance">
               {household.name}
             </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-sm text-blue-100/90">
               {[
                 household.guardians.length > 0
                   ? `Parent: ${household.guardians.join(", ")}`
@@ -239,15 +240,15 @@ export function HouseholdPayment({
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-muted-foreground">Total balance</p>
-            <p className="text-3xl font-semibold tracking-tight tabular-nums">
+            <p className="text-sm text-blue-100">Total balance</p>
+            <p className="text-4xl font-semibold tracking-tight tabular-nums">
               {formatMoney(familyBalance)}
             </p>
           </div>
         </header>
 
         {household.students.length === 0 && (
-          <p className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">
+          <p className={cn(portalCard, "p-6 text-center text-sm text-slate-500")}>
             No students are linked to this parent.
           </p>
         )}
@@ -259,11 +260,11 @@ export function HouseholdPayment({
             <section
               key={student.id}
               aria-label={student.name}
-              className="overflow-hidden rounded-xl border bg-card"
+              className={cn(portalCard, "overflow-hidden")}
             >
-              <div className="flex items-baseline justify-between gap-3 border-b px-4 py-3">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5">
                 <div className="min-w-0">
-                  <h2 className="truncate font-medium">{student.name}</h2>
+                  <h2 className="truncate font-semibold text-slate-900">{student.name}</h2>
                   <p className="truncate text-xs text-muted-foreground">
                     {student.gradeLevel
                       ? [student.gradeLevel, student.sectionName, student.studentNumber]
@@ -272,7 +273,7 @@ export function HouseholdPayment({
                       : "Not enrolled this school year"}
                   </p>
                 </div>
-                <p className="shrink-0 text-sm font-medium tabular-nums">
+                <p className="shrink-0 text-base font-semibold text-slate-900 tabular-nums">
                   {formatMoney(balance)}
                 </p>
               </div>
@@ -283,7 +284,7 @@ export function HouseholdPayment({
                   Fully paid
                 </p>
               ) : (
-                <ul className="divide-y">
+                <ul className="divide-y divide-slate-100">
                   {own.map((line) => (
                     <ChargeRow
                       key={line.chargeId}
@@ -314,26 +315,25 @@ export function HouseholdPayment({
       {!nothingOwed && (
         <aside
           aria-label="Receive payment"
-          className="space-y-4 rounded-xl border bg-card p-4 lg:sticky lg:top-20"
+          className={cn(portalCard, "space-y-4 p-5 lg:sticky lg:top-6")}
         >
-          <Button
+          <button
             type="button"
-            variant="outline"
-            className="h-11 w-full"
+            className="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-blue-50 text-sm font-semibold text-blue-700 ring-1 ring-blue-100 transition-colors hover:bg-blue-100 disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-4 focus-visible:ring-blue-200 focus-visible:outline-none"
             disabled={partial || submitting}
             onClick={() => setLines((ls) => (allSelected ? clearAll(ls) : selectAll(ls)))}
           >
             {allSelected ? "Clear selection" : "Pay full balance"}
-          </Button>
+          </button>
 
-          <div className="flex items-baseline justify-between gap-3 border-t pt-4">
-            <span className="text-sm text-muted-foreground">To receive</span>
-            <span className="text-3xl font-semibold tracking-tight tabular-nums">
+          <div className="flex items-baseline justify-between gap-3 border-t border-slate-100 pt-4">
+            <span className="text-sm text-slate-500">To receive</span>
+            <span className="text-3xl font-semibold tracking-tight text-slate-900 tabular-nums">
               {formatMoney(total)}
             </span>
           </div>
 
-          <div role="group" aria-label="Payment method" className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">
+          <div role="group" aria-label="Payment method" className="grid grid-cols-4 gap-1 rounded-2xl bg-slate-100 p-1">
             {METHODS.map((m) => (
               <button
                 key={m.value}
@@ -345,11 +345,11 @@ export function HouseholdPayment({
                   setTendered("");
                 }}
                 className={cn(
-                  "min-h-10 cursor-pointer rounded-md text-sm font-medium transition-colors disabled:cursor-not-allowed",
-                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                  "min-h-11 cursor-pointer rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed",
+                  "focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none",
                   method === m.value
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-white text-blue-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900",
                 )}
               >
                 {m.label}
@@ -379,22 +379,20 @@ export function HouseholdPayment({
                 placeholder="0.00"
                 aria-invalid={shortTendered}
                 aria-describedby={shortTendered ? "cashier-tendered-error" : undefined}
-                className="h-12 text-right text-lg tabular-nums"
+                className="h-14 rounded-2xl border-slate-200 bg-white text-right text-xl tabular-nums focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-500/15"
               />
               {total > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {quickTenders(total).map((amount) => (
-                    <Button
+                    <button
                       key={amount}
                       type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="min-h-9 flex-1 tabular-nums"
+                      className="min-h-10 flex-1 cursor-pointer rounded-full bg-slate-100 px-3 text-sm font-medium text-slate-700 tabular-nums transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none"
                       disabled={partial || submitting}
                       onClick={() => setTendered(String(amount))}
                     >
                       {amount === total ? "Exact" : formatMoney(amount).replace(".00", "")}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               )}
@@ -406,7 +404,7 @@ export function HouseholdPayment({
               {change !== null && !partial && (
                 <div
                   aria-live="polite"
-                  className="flex items-baseline justify-between gap-3 rounded-lg bg-success/10 px-3 py-2.5"
+                  className="flex items-baseline justify-between gap-3 rounded-2xl bg-emerald-50 px-4 py-3 text-emerald-900 ring-1 ring-emerald-200"
                 >
                   <span className="text-sm font-medium">Change</span>
                   <span className="text-2xl font-semibold tabular-nums">
@@ -425,7 +423,7 @@ export function HouseholdPayment({
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
                 aria-invalid={attempted && needsReference}
-                className="h-11"
+                className="h-14 rounded-2xl border-slate-200 bg-white text-base focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-500/15"
               />
             </div>
           )}
@@ -447,7 +445,7 @@ export function HouseholdPayment({
           {partial ? (
             <div
               role="alert"
-              className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm"
+              className="space-y-3 rounded-2xl bg-red-50 p-4 text-sm ring-1 ring-red-200"
             >
               <p className="flex items-start gap-2 font-medium text-destructive">
                 <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -478,13 +476,14 @@ export function HouseholdPayment({
               </div>
             </div>
           ) : (
-            <Button
-              className="h-12 w-full text-base"
+            <button
+              type="button"
+              className={portalButton}
               disabled={submitting}
               onClick={attempt}
             >
               {total > 0 ? `Receive ${formatMoney(total)}` : "Select what to pay"}
-            </Button>
+            </button>
           )}
         </aside>
       )}
@@ -535,7 +534,7 @@ function ChargeRow({
     <li
       className={cn(
         "flex flex-wrap items-center gap-x-3 gap-y-2 px-4 transition-colors",
-        line.selected && "bg-accent/40",
+        line.selected && "bg-blue-50/70",
       )}
     >
       <label
@@ -579,7 +578,7 @@ function ChargeRow({
               onAmount(parseMoneyInput(e.target.value));
             }}
             onBlur={() => setDraft(null)}
-            className="h-10 w-28 text-right tabular-nums"
+            className="h-11 w-32 rounded-xl border-slate-200 bg-white text-right text-base tabular-nums focus-visible:border-blue-500 focus-visible:ring-4 focus-visible:ring-blue-500/15"
           />
         </div>
       ) : (

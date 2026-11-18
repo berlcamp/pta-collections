@@ -389,6 +389,17 @@
   }
 }
 
+/* The cashier desk wears the portal's blue at EVERY width: it is a desk app on
+   a laptop or tablet, not a phone screen with a hero. Same gradient, fixed, so
+   long receipt lists scroll over it. */
+.cashier-page {
+  background:
+    radial-gradient(70% 60% at 100% 0%, color-mix(in oklab, var(--portal-blue-400) 45%, transparent) 0%, transparent 60%),
+    radial-gradient(60% 60% at 0% 100%, color-mix(in oklab, var(--portal-blue-950) 70%, transparent) 0%, transparent 70%),
+    linear-gradient(160deg, var(--portal-blue-950) 0%, var(--portal-blue-800) 50%, var(--portal-blue-600) 100%);
+  background-attachment: fixed;
+}
+
 .portal-cta {
   background: linear-gradient(135deg, var(--portal-blue-800) 0%, var(--portal-blue-600) 100%);
 }

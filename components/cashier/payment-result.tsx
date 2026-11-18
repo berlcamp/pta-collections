@@ -2,6 +2,8 @@
 
 import { CircleCheck, Printer, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { portalButton, portalCard } from "@/components/portal/styles";
+import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/financial/money";
 import type { CollectResult } from "./household-payment";
 
@@ -17,20 +19,22 @@ export function PaymentResult({
     <section
       aria-labelledby="payment-recorded"
       aria-live="polite"
-      className="mx-auto max-w-lg rounded-xl border bg-card p-6"
+      className={cn(portalCard, "portal-in mx-auto max-w-lg p-6 sm:p-8")}
     >
       <div className="text-center">
-        <CircleCheck className="mx-auto size-10 text-success" aria-hidden />
-        <h1 id="payment-recorded" className="mt-3 text-sm text-muted-foreground">
+        <span className="mx-auto grid size-18 place-items-center rounded-full bg-emerald-500 text-white shadow-xl shadow-emerald-700/25">
+          <CircleCheck className="size-10" aria-hidden />
+        </span>
+        <h1 id="payment-recorded" className="mt-4 text-sm text-slate-500">
           Payment recorded for {result.payerName}
         </h1>
-        <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums">
+        <p className="mt-1 text-5xl font-semibold tracking-tight text-slate-900 tabular-nums">
           {formatMoney(result.total)}
         </p>
       </div>
 
       {result.change !== null && (
-        <div className="mt-5 flex items-baseline justify-between gap-3 rounded-lg bg-success/10 px-4 py-3">
+        <div className="mt-6 flex items-baseline justify-between gap-3 rounded-2xl bg-emerald-50 px-5 py-4 text-emerald-900 ring-1 ring-emerald-200">
           <span className="font-medium">Give change</span>
           <span className="text-3xl font-semibold tabular-nums">
             {formatMoney(result.change)}
@@ -38,7 +42,7 @@ export function PaymentResult({
         </div>
       )}
 
-      <ul className="mt-5 divide-y border-y">
+      <ul className="mt-5 divide-y divide-slate-100 rounded-2xl bg-slate-50 px-4 ring-1 ring-slate-900/5">
         {result.receipts.map((receipt) => (
           <li key={receipt.paymentId} className="flex items-center gap-3 py-2.5">
             <div className="min-w-0 flex-1">
@@ -47,7 +51,7 @@ export function PaymentResult({
                 {receipt.receiptNumber} &middot; {formatMoney(receipt.total)}
               </p>
             </div>
-            <Button asChild variant="outline" className="min-h-10">
+            <Button asChild variant="outline" className="min-h-11 rounded-full border-slate-200 bg-white">
               <a
                 href={`/print/receipt/${receipt.paymentId}`}
                 target="_blank"
@@ -62,17 +66,17 @@ export function PaymentResult({
         ))}
       </ul>
 
-      <p className="mt-4 flex items-baseline justify-between text-sm text-muted-foreground">
+      <p className="mt-4 flex items-baseline justify-between px-1 text-sm text-slate-500">
         <span>Balance still owing</span>
         <span className="font-medium text-foreground tabular-nums">
           {formatMoney(result.remaining)}
         </span>
       </p>
 
-      <Button className="mt-5 h-12 w-full text-base" onClick={onNext}>
-        <ScanLine className="size-4" aria-hidden />
+      <button type="button" className={cn(portalButton, "mt-6")} onClick={onNext}>
+        <ScanLine className="size-5" aria-hidden />
         Next parent
-      </Button>
+      </button>
     </section>
   );
 }
