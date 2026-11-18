@@ -86,9 +86,6 @@ export default async function StudentProfilePage({
   if (!profile) notFound();
 
   const { student, enrollment, guardians, charges, payments, totals } = profile;
-  const outstanding = charges.filter(
-    (c) => c.status === "active" && Number(c.balance) > 0,
-  );
 
   // Only the attendance panel pays for the gate reads. The other two tabs are
   // the ones opened all day at the counter, and neither has any use for them.
@@ -132,14 +129,6 @@ export default async function StudentProfilePage({
                 <Link href={`/students/new?sibling=${student.id}`}>
                   <UserPlus className="size-4" />
                   Add sibling
-                </Link>
-              </Button>
-            )}
-            {can(ctx.activeRole, "recordPayment") && outstanding.length > 0 && (
-              <Button asChild>
-                <Link href={`/collections/new?student=${student.id}`}>
-                  <Wallet className="size-4" />
-                  Record payment
                 </Link>
               </Button>
             )}

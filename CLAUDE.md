@@ -388,7 +388,8 @@ already allows and records through `createPayment` / `create_payment()`.
   rather than charging twice, and the screen locks until that is settled.
 - **Balances span every school year.** `lookup_parent_card()` sums all years and D25
   keeps a graduate's dues, so the desk lists prior-year charges too and they are
-  payable there. `/collections/new` still lists the active year only.
+  payable there. The desk is the only place a payment is taken: `/collections/new`
+  redirects to `/cashier`, and `/collections` is the record of receipts.
 - **`amount_tendered` is recorded only when one receipt covers the visit.** One bill
   for two children is true of neither receipt. The desk still shows the change.
 - **Scanners are detected by key timing** (`lib/cashier/scan-buffer.ts`), on the

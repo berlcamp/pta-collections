@@ -100,7 +100,7 @@ export function PenaltyDialog({
   });
 
   const term = query.trim();
-  // Derived rather than stored — see new-payment-flow for the same reasoning.
+  // Derived rather than stored, like every balance here (D15).
   const visibleHits = student || term.length < 2 ? [] : hits;
 
   useEffect(() => {

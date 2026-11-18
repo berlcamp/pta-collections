@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Receipt as ReceiptIcon } from "lucide-react";
+import { Receipt as ReceiptIcon, Wallet } from "lucide-react";
 import { requireSchool } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/button";
@@ -91,13 +91,13 @@ export default async function PaymentHistoryPage({
         actions={
           <>
             <SchoolYearPicker years={schoolYears} current={schoolYear.id} />
-            {/* Recording a payment left the sidebar when it collapsed to one
-                row per module; it lives with the receipts it creates. */}
+            {/* Payments are taken at the cashier desk only; this page is the
+                record of them. */}
             {can(ctx.activeRole, "recordPayment") && (
               <Button asChild>
-                <Link href="/collections/new">
-                  <Plus className="size-4" />
-                  New payment
+                <Link href="/cashier">
+                  <Wallet className="size-4" />
+                  Cashier desk
                 </Link>
               </Button>
             )}

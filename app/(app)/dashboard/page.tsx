@@ -138,9 +138,9 @@ export default async function DashboardPage({
             <SchoolYearPicker years={schoolYears} current={schoolYear.id} />
             {can(session.activeRole, "recordPayment") && (
               <Button asChild>
-                <Link href="/collections/new">
+                <Link href="/cashier">
                   <Wallet className="size-4" />
-                  New payment
+                  Cashier desk
                 </Link>
               </Button>
             )}
