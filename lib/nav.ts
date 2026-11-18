@@ -82,6 +82,12 @@ export const SCHOOL_NAV: NavGroup[] = [
         label: "Students & Parents",
         href: "/students",
         icon: "GraduationCap",
+        children: [
+          { label: "Students", href: "/students", icon: "GraduationCap" },
+          // One parent record per person is what makes siblings one family;
+          // this is where duplicates are found and merged (0027).
+          { label: "Parents", href: "/students/parents", icon: "Users", capability: "manageStudents" },
+        ],
       },
       {
         label: "Collections",

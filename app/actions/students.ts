@@ -159,7 +159,9 @@ export async function createStudent(
       .select("id")
       .eq("school_id", ctx.activeSchool.id)
       .ilike("first_name", g.first_name)
-      .ilike("last_name", g.last_name);
+      .ilike("last_name", g.last_name)
+      // A merged duplicate (0027) is history, never a match.
+      .is("merged_into", null);
     match = contact
       ? match.eq("contact_number", contact)
       : match.is("contact_number", null);
@@ -325,7 +327,9 @@ export async function updateStudent(
       .select("id")
       .eq("school_id", ctx.activeSchool.id)
       .ilike("first_name", g.first_name)
-      .ilike("last_name", g.last_name);
+      .ilike("last_name", g.last_name)
+      // A merged duplicate (0027) is history, never a match.
+      .is("merged_into", null);
     match = contact
       ? match.eq("contact_number", contact)
       : match.is("contact_number", null);

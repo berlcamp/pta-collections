@@ -416,6 +416,26 @@ reads `pta.v_section_charge_summary`.
   repriced in place.
 - `assess_annual_fees()` is left as applied history. The app no longer calls it.
 
+### One parent RECORD per person: siblings are a family only through it
+`0027_guardian_merge.sql`. Students → Parents (`/students/parents`) lists
+`pta.v_guardian_duplicates` and merges through `pta.merge_guardians()`.
+
+- **A merged parent is kept, never deleted.** It is marked `merged_into` and has
+  no children. Deleting it would cascade through `portal_accounts` into
+  `payment_claims` and erase what that card ever submitted.
+- **A BEFORE INSERT/UPDATE trigger on `student_guardians` redirects** a link aimed at
+  a merged record to the survivor. That covers every writer, including import and
+  the gate board, which match parents their own way. TypeScript lookups also filter
+  `merged_into is null`.
+- **Card rules:**
+  - If only the duplicate holds a card, the merge is refused, so keep that record.
+  - If both hold one, the duplicate's card is revoked.
+  - If neither does, the survivor is minted one.
+  - A duplicate with an online payment awaiting review is refused until a cashier
+    approves or rejects it.
+- "Not the same person" goes in `guardian_duplicate_dismissals`, one row per
+  unordered pair (`guardian_a < guardian_b`).
+
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through
   `SECURITY DEFINER` RPCs in `pta`. Never write `payments` or `donations` from
