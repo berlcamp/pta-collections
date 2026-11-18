@@ -1,9 +1,6 @@
-import { ScanLine } from "lucide-react";
-
 import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { CashierNav } from "@/components/cashier/cashier-nav";
-import { SchoolSwitcher } from "@/components/layout/school-switcher";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 
 /** Tenant-scoped and authenticated, the same as the (app) group (D20). */
@@ -40,17 +37,6 @@ export default async function CashierLayout({
     <div className="cashier-page flex min-h-svh flex-col text-slate-900">
       <header className="text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-4 pt-4 pb-5 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-blue-700 shadow-lg shadow-blue-950/30">
-              <ScanLine className="size-6" aria-hidden />
-            </span>
-            {/* The switcher is the staff app's own control, drawn for a light
-                surface, so it sits in a white chip rather than being restyled. */}
-            <div className="min-w-0 rounded-2xl bg-white px-2 py-1 text-slate-900 shadow-lg shadow-blue-950/20 [&_button]:border-0 [&_button]:bg-transparent [&_button]:shadow-none">
-              <SchoolSwitcher session={session} />
-            </div>
-          </div>
-
           <CashierNav pendingClaims={count ?? 0} />
 
           <div className="ml-auto flex items-center gap-2">
@@ -70,6 +56,13 @@ export default async function CashierLayout({
           {children}
         </div>
       </main>
+
+      {/* The school is named once, quietly, down here: the desk serves one
+          school and the cashier knows which. There is deliberately no school
+          switcher on this desk. */}
+      <footer className="pb-5 text-center text-xs text-blue-100/80">
+        {session.activeSchool.name}
+      </footer>
     </div>
   );
 }
