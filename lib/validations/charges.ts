@@ -5,7 +5,7 @@ export const feeTypeSchema = z.object({
   id: dbId().optional(),
   name: z.string().trim().min(2, "Give the fee a name.").max(120),
   description: z.string().trim().max(500).optional().nullable(),
-  category: z.enum(["annual", "penalty", "special", "other"]),
+  category: z.enum(["annual", "penalty", "special", "other", "homeroom"]),
   default_amount: z
     .number()
     .nonnegative("Amount cannot be negative.")
@@ -15,12 +15,30 @@ export const feeTypeSchema = z.object({
   active: z.boolean(),
 });
 
-export const assessSchema = z.object({
-  schoolYearId: dbId(),
-  feeTypeIds: z.array(dbId()).min(1, "Select at least one fee type."),
-  studentIds: z.array(dbId()).nullable(),
-  dueDate: z.string().nullable(),
-});
+/**
+ * Who a bulk assessment reaches: the whole school, some grades, or some
+ * sections (0026). The scope is resolved in SQL from student_enrollments, so
+ * the browser names grades and sections, never students.
+ */
+export const assessSchema = z
+  .object({
+    schoolYearId: dbId(),
+    feeTypeIds: z.array(dbId()).min(1, "Select at least one fee type."),
+    gradeLevels: z.array(z.string().min(1)).nullable(),
+    sectionIds: z.array(dbId()).nullable(),
+    amount: z
+      .number()
+      .positive("The amount must be greater than zero.")
+      .max(9_999_999.99)
+      .nullable(),
+    dueDate: z.string().nullable(),
+  })
+  .refine((v) => !(v.gradeLevels?.length && v.sectionIds?.length), {
+    message: "Choose grades or sections, not both.",
+  })
+  .refine((v) => v.amount == null || new Set(v.feeTypeIds).size === 1, {
+    message: "An amount can only be set when assessing a single fee type.",
+  });
 
 export const penaltySchema = z.object({
   studentId: dbId(),

@@ -8,6 +8,7 @@ import {
   CalendarCheck,
   CalendarRange,
   ClipboardList,
+  DoorOpen,
   FileBarChart,
   FileSpreadsheet,
   FileText,
@@ -70,6 +71,7 @@ const ICONS: Record<NavIconName, LucideIcon> = {
   IdCard,
   Smartphone,
   Inbox,
+  DoorOpen,
 };
 
 export function NavIcon({

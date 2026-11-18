@@ -8,6 +8,7 @@ import { z } from "zod";
 import { CheckCircle2, Info, ListChecks, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -44,14 +45,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatMoney } from "@/lib/financial/money";
+import { formatMoney, parseMoneyInput } from "@/lib/financial/money";
 import { assessAnnualFees } from "@/app/actions/charges";
+import { dynamicRoute } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 import type { FeeType, SchoolYear } from "@/types/database.types";
 import { dbId } from "@/lib/validations/id";
+
+export type ScopeGrade = {
+  code: string;
+  label: string;
+  /** Enrolled in the grade, sectioned or not. */
+  count: number;
+  sections: { id: string; name: string; count: number }[];
+};
+
+type Scope = "all" | "grades" | "sections";
 
 const formSchema = z.object({
   schoolYearId: dbId(),
   feeTypeIds: z.array(dbId()).min(1, "Select at least one fee type."),
+  scope: z.enum(["all", "grades", "sections"]),
+  gradeLevels: z.array(z.string()),
+  sectionIds: z.array(z.string()),
+  amount: z.string(),
   dueDate: z.string(),
 });
 
@@ -62,11 +79,13 @@ export function AssessFeesForm({
   currentYearId,
   feeTypes,
   enrolledCount,
+  grades,
 }: {
   schoolYears: SchoolYear[];
   currentYearId: string;
   feeTypes: FeeType[];
   enrolledCount: number;
+  grades: ScopeGrade[];
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -81,34 +100,100 @@ export function AssessFeesForm({
     defaultValues: {
       schoolYearId: currentYearId,
       feeTypeIds: [],
+      scope: "all",
+      gradeLevels: [],
+      sectionIds: [],
+      amount: "",
       dueDate: "",
     },
   });
 
-  const usable = feeTypes.filter(
-    (f) => f.default_amount != null && f.default_amount > 0,
+  const [selected, scope, gradeLevels, sectionIds, amountText] = form.watch([
+    "feeTypeIds",
+    "scope",
+    "gradeLevels",
+    "sectionIds",
+    "amount",
+  ]);
+
+  const chosen = feeTypes.filter((f) => selected.includes(f.id));
+  const single = chosen.length === 1 ? chosen[0] : null;
+  const override = single && amountText.trim() !== "" ? parseMoneyInput(amountText) : null;
+  const perStudent =
+    override != null && override > 0
+      ? override
+      : chosen.reduce((s, f) => s + Number(f.default_amount ?? 0), 0);
+
+  // A fee with no default can still be assessed — but only alone, and only
+  // with an amount typed in. That is the normal shape of a homeroom fee.
+  const needsAmount = Boolean(single && !(Number(single.default_amount) > 0));
+  const missingDefault = !single && chosen.some((f) => !(Number(f.default_amount) > 0));
+
+  const allSections = grades.flatMap((g) =>
+    g.sections.map((s) => ({ ...s, grade: g.label })),
   );
-  const selected = form.watch("feeTypeIds");
-  const chosen = usable.filter((f) => selected.includes(f.id));
-  const perStudent = chosen.reduce((s, f) => s + Number(f.default_amount ?? 0), 0);
+  const targetCount =
+    scope === "all"
+      ? enrolledCount
+      : scope === "grades"
+        ? grades
+            .filter((g) => gradeLevels.includes(g.code))
+            .reduce((s, g) => s + g.count, 0)
+        : allSections
+            .filter((s) => sectionIds.includes(s.id))
+            .reduce((s, x) => s + x.count, 0);
+
+  const scopeLabel =
+    scope === "all"
+      ? "the whole school"
+      : scope === "grades"
+        ? grades
+            .filter((g) => gradeLevels.includes(g.code))
+            .map((g) => g.label)
+            .join(", ")
+        : allSections
+            .filter((s) => sectionIds.includes(s.id))
+            .map((s) => `${s.grade} ${s.name}`)
+            .join(", ");
+
+  const scopeEmpty =
+    (scope === "grades" && gradeLevels.length === 0) ||
+    (scope === "sections" && sectionIds.length === 0);
+  const amountInvalid =
+    (needsAmount && !(override != null && override > 0)) ||
+    (override != null && !(override > 0));
 
   /**
    * Submitting does not assess: it validates, then opens the confirmation.
-   * Assessment writes a charge for every enrolled student in one transaction,
+   * Assessment writes a charge for every targeted student in one transaction,
    * which is not something to trigger on a stray Enter key.
    */
   function onValid() {
+    if (scopeEmpty) {
+      toast.error(scope === "grades" ? "Pick at least one grade." : "Pick at least one section.");
+      return;
+    }
+    if (missingDefault) {
+      toast.error("A fee with no default amount has to be assessed on its own, with an amount.");
+      return;
+    }
+    if (amountInvalid) {
+      form.setError("amount", { message: "Enter an amount greater than zero." });
+      return;
+    }
     setConfirmOpen(true);
   }
 
   function assess() {
-    const values = form.getValues();
+    const v = form.getValues();
     startTransition(async () => {
       const res = await assessAnnualFees({
-        schoolYearId: values.schoolYearId,
-        feeTypeIds: values.feeTypeIds,
-        studentIds: null,
-        dueDate: values.dueDate || null,
+        schoolYearId: v.schoolYearId,
+        feeTypeIds: v.feeTypeIds,
+        gradeLevels: v.scope === "grades" ? v.gradeLevels : null,
+        sectionIds: v.scope === "sections" ? v.sectionIds : null,
+        amount: override != null && override > 0 ? override : null,
+        dueDate: v.dueDate || null,
       });
       setConfirmOpen(false);
       if (!res.ok) {
@@ -121,6 +206,10 @@ export function AssessFeesForm({
       );
       router.refresh();
     });
+  }
+
+  function toggle(list: string[], id: string, on: boolean) {
+    return on ? [...list, id] : list.filter((x) => x !== id);
   }
 
   return (
@@ -151,7 +240,14 @@ export function AssessFeesForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="sr-only">School year</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      // Sections belong to a year; reload them for the new one.
+                      router.push(dynamicRoute(`/charges/assess?sy=${v}`));
+                    }}
+                  >
                     <FormControl>
                       <SelectTrigger className="w-full max-w-xs">
                         <SelectValue />
@@ -177,7 +273,8 @@ export function AssessFeesForm({
           <CardHeader>
             <CardTitle>2. Fee types</CardTitle>
             <CardDescription>
-              Only fees with a default amount above zero can be assessed in bulk.
+              A fee with no default amount — usually a homeroom contribution — is
+              assessed on its own, and you type its amount below.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -186,15 +283,16 @@ export function AssessFeesForm({
               name="feeTypeIds"
               render={({ field }) => (
                 <FormItem>
-                  {usable.length === 0 ? (
+                  {feeTypes.length === 0 ? (
                     <p className="py-4 text-sm text-muted-foreground">
-                      No assessable fee types. An annual or special fee needs a
-                      default amount greater than zero before it can be assessed.
+                      No assessable fee types. Add an annual, special or homeroom
+                      fee under Charges → Fee types first.
                     </p>
                   ) : (
                     <div className="divide-y rounded-lg border">
-                      {usable.map((f) => {
+                      {feeTypes.map((f) => {
                         const checked = field.value.includes(f.id);
+                        const hasDefault = Number(f.default_amount) > 0;
                         return (
                           <label
                             key={f.id}
@@ -203,23 +301,29 @@ export function AssessFeesForm({
                             <Checkbox
                               checked={checked}
                               onCheckedChange={(v) =>
-                                field.onChange(
-                                  v
-                                    ? [...field.value, f.id]
-                                    : field.value.filter((x) => x !== f.id),
-                                )
+                                field.onChange(toggle(field.value, f.id, Boolean(v)))
                               }
                             />
                             <span className="flex-1 text-sm font-medium">
                               {f.name}
+                              {f.category === "homeroom" && (
+                                <Badge variant="secondary" className="ml-2 align-middle">
+                                  Homeroom
+                                </Badge>
+                              )}
                               {f.description && (
                                 <span className="block text-xs font-normal text-muted-foreground">
                                   {f.description}
                                 </span>
                               )}
                             </span>
-                            <span className="font-mono text-sm tabular-nums">
-                              {formatMoney(f.default_amount)}
+                            <span
+                              className={cn(
+                                "font-mono text-sm tabular-nums",
+                                !hasDefault && "text-xs text-muted-foreground",
+                              )}
+                            >
+                              {hasDefault ? formatMoney(f.default_amount) : "Set amount"}
                             </span>
                           </label>
                         );
@@ -230,13 +334,172 @@ export function AssessFeesForm({
                 </FormItem>
               )}
             />
+
+            {single && (
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem className="mt-4">
+                    <FormLabel>
+                      Amount per student
+                      {!needsAmount && (
+                        <span className="font-normal text-muted-foreground">
+                          {" "}
+                          (optional — blank uses {formatMoney(single.default_amount)})
+                        </span>
+                      )}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        className="w-48 font-mono"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Each room can carry its own amount: assess Rizal at ₱200, then
+                      Mabini at ₱150, under the same fee.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {missingDefault && (
+              <p className="mt-3 text-sm text-destructive">
+                A fee marked “Set amount” has to be assessed on its own.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>3. Who to charge</CardTitle>
+            <CardDescription>
+              Only students currently enrolled in this school year are charged.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="scope"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="sr-only">Scope</FormLabel>
+                  <div
+                    role="radiogroup"
+                    className="inline-flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1"
+                  >
+                    {(
+                      [
+                        ["all", "Whole school"],
+                        ["grades", "Grades"],
+                        ["sections", "Sections"],
+                      ] as [Scope, string][]
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={field.value === value}
+                        onClick={() => field.onChange(value)}
+                        className={cn(
+                          "h-9 rounded-md px-4 text-sm font-medium transition-colors",
+                          field.value === value
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {scope === "grades" && (
+              <FormField
+                control={form.control}
+                name="gradeLevels"
+                render={({ field }) => (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {grades.map((g) => (
+                      <label
+                        key={g.code}
+                        className="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 hover:bg-muted/50"
+                      >
+                        <Checkbox
+                          checked={field.value.includes(g.code)}
+                          onCheckedChange={(v) =>
+                            field.onChange(toggle(field.value, g.code, Boolean(v)))
+                          }
+                        />
+                        <span className="flex-1 text-sm font-medium">{g.label}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {g.count}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              />
+            )}
+
+            {scope === "sections" &&
+              (allSections.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  This school year has no sections yet. Add them under
+                  Administration → Sections.
+                </p>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="sectionIds"
+                  render={({ field }) => (
+                    <div className="space-y-4">
+                      {grades
+                        .filter((g) => g.sections.length > 0)
+                        .map((g) => (
+                          <div key={g.code}>
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {g.label}
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              {g.sections.map((s) => (
+                                <label
+                                  key={s.id}
+                                  className="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 hover:bg-muted/50"
+                                >
+                                  <Checkbox
+                                    checked={field.value.includes(s.id)}
+                                    onCheckedChange={(v) =>
+                                      field.onChange(toggle(field.value, s.id, Boolean(v)))
+                                    }
+                                  />
+                                  <span className="flex-1 text-sm font-medium">{s.name}</span>
+                                  <span className="text-xs tabular-nums text-muted-foreground">
+                                    {s.count}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                />
+              ))}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
             <CardTitle>
-              3. Due date{" "}
+              4. Due date{" "}
               <span className="text-sm font-normal text-muted-foreground">
                 (optional)
               </span>
@@ -267,21 +530,23 @@ export function AssessFeesForm({
           <CardContent className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-sm">
               <p>
-                <span className="font-semibold">
-                  {enrolledCount.toLocaleString()}
-                </span>{" "}
-                enrolled students &times;{" "}
+                <span className="font-semibold">{targetCount.toLocaleString()}</span>{" "}
+                student{targetCount === 1 ? "" : "s"} &times;{" "}
                 <span className="font-semibold">{chosen.length}</span> fee
                 {chosen.length === 1 ? "" : "s"}
               </p>
               <p className="text-muted-foreground">
                 {formatMoney(perStudent)} per student ·{" "}
-                {formatMoney(perStudent * enrolledCount)} total if none exist yet
+                {formatMoney(perStudent * targetCount)} total if none exist yet
               </p>
             </div>
-            <Button type="submit" size="lg" disabled={enrolledCount === 0}>
+            <Button
+              type="submit"
+              size="lg"
+              disabled={targetCount === 0 || chosen.length === 0}
+            >
               <ListChecks className="size-4" />
-              Assess all enrolled students
+              {scope === "all" ? "Assess all enrolled students" : "Assess selected"}
             </Button>
           </CardContent>
         </Card>
@@ -302,13 +567,14 @@ export function AssessFeesForm({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                Assess fees for {enrolledCount.toLocaleString()} students?
+                Assess {targetCount.toLocaleString()} student
+                {targetCount === 1 ? "" : "s"}?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                This creates {chosen.length} charge
-                {chosen.length === 1 ? "" : "s"} per enrolled student, worth{" "}
-                {formatMoney(perStudent)} each. Students who already have these
-                charges are skipped automatically.
+                This charges {scopeLabel} {chosen.length} fee
+                {chosen.length === 1 ? "" : "s"}, worth {formatMoney(perStudent)} per
+                student. Students who already have these charges are skipped — and
+                keep their existing amount.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

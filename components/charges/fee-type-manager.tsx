@@ -47,6 +47,11 @@ const CATEGORIES: { value: FeeCategory; label: string; hint: string }[] = [
   { value: "annual", label: "Annual", hint: "Assessed to every student each school year" },
   { value: "penalty", label: "Penalty", hint: "Charged to an individual student" },
   { value: "special", label: "Special", hint: "One-off assessment" },
+  {
+    value: "homeroom",
+    label: "Homeroom",
+    hint: "For one grade or section; the amount can be set per room when assessing",
+  },
   { value: "other", label: "Other", hint: "Anything else" },
 ];
 
@@ -59,7 +64,7 @@ const CATEGORIES: { value: FeeCategory; label: string; hint: string }[] = [
 const formSchema = z
   .object({
     name: z.string().trim().min(2, "Give the fee a name.").max(120),
-    category: z.enum(["annual", "penalty", "special", "other"]),
+    category: z.enum(["annual", "penalty", "special", "other", "homeroom"]),
     default_amount: z
       .string()
       .refine(

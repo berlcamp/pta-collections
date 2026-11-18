@@ -124,6 +124,7 @@ export function FeeTypesTable({
             { value: "annual", label: "Annual" },
             { value: "penalty", label: "Penalty" },
             { value: "special", label: "Special" },
+            { value: "homeroom", label: "Homeroom" },
             { value: "other", label: "Other" },
           ],
         },

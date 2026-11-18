@@ -45,7 +45,8 @@ export type NavIconName =
   | "Radio"
   | "IdCard"
   | "Smartphone"
-  | "Inbox";
+  | "Inbox"
+  | "DoorOpen";
 
 export interface NavItem {
   label: string;
@@ -103,7 +104,7 @@ export const SCHOOL_NAV: NavGroup[] = [
         children: [
           { label: "Outstanding dues", href: "/charges/outstanding", icon: "FileText" },
           { label: "Fee types", href: "/charges/fees", icon: "BadgePercent", capability: "manageFeeTypes" },
-          { label: "Assess annual fees", href: "/charges/assess", icon: "ListChecks", capability: "assessFees" },
+          { label: "Assess fees", href: "/charges/assess", icon: "ListChecks", capability: "assessFees" },
           { label: "Student penalties", href: "/charges/penalties", icon: "ClipboardList", capability: "createPenalty" },
         ],
       },
@@ -134,6 +135,7 @@ export const SCHOOL_NAV: NavGroup[] = [
         children: [
           { label: "Collections", href: "/reports/collections", icon: "FileBarChart" },
           { label: "Fee types", href: "/reports/fee-types", icon: "FileSpreadsheet" },
+          { label: "Sections", href: "/reports/sections", icon: "DoorOpen" },
           { label: "Cashiers", href: "/reports/cashiers", icon: "Users" },
           { label: "Donations", href: "/reports/donations", icon: "Gift" },
           // Attendance is a report even though its data comes from the gate:

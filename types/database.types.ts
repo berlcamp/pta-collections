@@ -10,7 +10,7 @@ export type GlobalRole = "super_admin" | "user";
 export type SchoolRole = "admin" | "cashier" | "treasurer" | "viewer";
 export type MembershipStatus = "active" | "inactive";
 export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
-export type FeeCategory = "annual" | "penalty" | "special" | "other";
+export type FeeCategory = "annual" | "penalty" | "special" | "other" | "homeroom";
 export type ChargeStatus = "active" | "waived" | "cancelled";
 export type DerivedPaymentStatus =
   | "unpaid"
@@ -218,6 +218,24 @@ export interface FeeType {
   active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** One row of pta.v_section_charge_summary (0026): a section × fee type. */
+export interface SectionChargeSummary {
+  school_id: string;
+  school_year_id: string;
+  grade_level: string;
+  grade_sort: number;
+  section_id: string | null;
+  section_name: string | null;
+  fee_type_id: string;
+  fee_type_name: string;
+  fee_category: FeeCategory;
+  student_count: number;
+  unpaid_count: number;
+  charged: number;
+  collected: number;
+  balance: number;
 }
 
 export interface StudentCharge {

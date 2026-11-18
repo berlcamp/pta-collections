@@ -396,6 +396,21 @@ already allows and records through `createPayment` / `create_payment()`.
 - **Light only**, forced in `components/layout/theme-provider.tsx` by pathname, because
   next-themes ignores a nested provider.
 
+### A homeroom fee is a fee, scoped to a room
+`0026_homeroom_fees.sql`. Charges → Assess fees reaches the whole school, some
+grades, or some sections, through `pta.assess_fees_scoped()`; Reports → Sections
+reads `pta.v_section_charge_summary`.
+
+- **The PTA keeps the money**, so it is an ordinary `student_charge`: same
+  cashier, same portal, same receipt series. It is not a donation.
+- **The scope is resolved in SQL** from `student_enrollments`. The browser names
+  grades or sections, never a student list.
+- **The amount override is single-fee only**, so one "Homeroom contribution" fee
+  type can be ₱200 in Rizal and ₱150 in Mabini. Re-assessing keeps the first
+  charge at its first amount. A wrong amount is cancelled and re-assessed, never
+  repriced in place.
+- `assess_annual_fees()` is left as applied history. The app no longer calls it.
+
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through
   `SECURITY DEFINER` RPCs in `pta`. Never write `payments` or `donations` from

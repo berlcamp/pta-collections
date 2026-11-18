@@ -5,6 +5,7 @@ import {
   paymentIdsForFeeType,
 } from "@/lib/data/hydrate";
 import { lookupDonationNames } from "@/lib/data/donations";
+import type { SectionChargeSummary } from "@/types/database.types";
 
 export interface ReportFilters {
   schoolId: string;
@@ -434,5 +435,37 @@ export async function getDonationReport(
     payment_method: r.payment_method,
     item_description: r.item_description,
     received_by_name: names.profiles.get(r.received_by) ?? "—",
+  }));
+}
+
+/**
+ * Per section, per fee type: charged, collected, still owed (0026). A school
+ * has at most a few hundred sections × fee types, so one page of rows covers
+ * it; the grouping itself happens in pta.v_section_charge_summary because
+ * PostgREST cannot GROUP BY.
+ */
+export async function getSectionChargeSummary(
+  schoolId: string,
+  schoolYearId: string,
+  category?: string | null,
+): Promise<SectionChargeSummary[]> {
+  const supabase = await createClient();
+  let q = supabase
+    .from("v_section_charge_summary")
+    .select("*")
+    .eq("school_id", schoolId)
+    .eq("school_year_id", schoolYearId);
+  if (category) q = q.eq("fee_category", category);
+  const { data, error } = await q
+    .order("grade_sort")
+    .order("section_name", { nullsFirst: false })
+    .order("fee_type_name")
+    .limit(5000);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    ...r,
+    charged: Number(r.charged),
+    collected: Number(r.collected),
+    balance: Number(r.balance),
   }));
 }
