@@ -344,3 +344,55 @@
   font-optical-sizing: auto;
   letter-spacing: -0.02em;
 }
+
+/* ---------------------------------------------------------------------------
+   Parent portal.
+
+   The portal is styled like a banking app, not like the staff console: a deep
+   blue hero that the content sheet slides up over. The colours live here as
+   tokens so the components never carry raw hex, and the portal is light-only
+   (forced in theme-provider.tsx) so these never need a dark twin.
+   --------------------------------------------------------------------------- */
+:root {
+  --portal-blue-950: #071d4f;
+  --portal-blue-800: #0f3a9e;
+  --portal-blue-600: #1f5fe0;
+  --portal-blue-400: #4f8bff;
+  --portal-sheet: #f3f6fb;
+}
+
+.portal-gradient {
+  background:
+    radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, var(--portal-blue-400) 55%, transparent) 0%, transparent 60%),
+    radial-gradient(90% 60% at 0% 100%, color-mix(in oklab, var(--portal-blue-950) 70%, transparent) 0%, transparent 70%),
+    linear-gradient(160deg, var(--portal-blue-950) 0%, var(--portal-blue-800) 45%, var(--portal-blue-600) 100%);
+}
+
+.portal-sheet {
+  background: var(--portal-sheet);
+}
+
+.portal-cta {
+  background: linear-gradient(135deg, var(--portal-blue-800) 0%, var(--portal-blue-600) 100%);
+}
+
+@keyframes portal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.portal-in {
+  animation: portal-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-in {
+    animation: none;
+  }
+}

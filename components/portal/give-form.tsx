@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
-import { CheckCircle2, HandCoins, HeartHandshake, Loader2, Paperclip } from "lucide-react";
+import { useState, useTransition } from "react";
+import { HandCoins, HeartHandshake, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -10,12 +10,17 @@ import {
   submitClaim,
   uploadProof,
 } from "@/app/actions/portal";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { GcashNumber } from "@/components/portal/gcash-number";
+import { ProofUpload } from "@/components/portal/proof-upload";
+import {
+  portalButton,
+  portalCard,
+  portalGhostButton,
+  portalInput,
+  portalLabel,
+} from "@/components/portal/styles";
 import { peso, t } from "@/lib/portal/i18n";
+import { cn } from "@/lib/utils";
 import type { PortalLocale, PortalProgram } from "@/types/database.types";
 
 type Mode = "donate" | "pledge" | null;
@@ -50,21 +55,21 @@ export function GiveForm({
   const [proofName, setProofName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   const value = Number(amount);
   const validAmount = Number.isFinite(value) && value > 0;
 
   async function attach(file: File) {
     setUploading(true);
+    setError(null);
     const form = new FormData();
     form.set("proof", file);
     const result = await uploadProof(form);
     setUploading(false);
     if (!result.ok) {
-        setError(result.error);
-        return;
-      }
+      setError(result.error);
+      return;
+    }
     setProofPath(result.data);
     setProofName(file.name);
   }
@@ -107,8 +112,9 @@ export function GiveForm({
       }
 
       toast.success(mode === "donate" ? copy.claimSubmitted : copy.pledgeMade);
+      const wasDonation = mode === "donate";
       reset();
-      router.push(mode === "donate" ? "/portal/claims" : "/portal/give");
+      router.push(wasDonation ? "/portal/pay/history" : "/portal/pay/give");
       router.refresh();
     });
   }
@@ -119,174 +125,167 @@ export function GiveForm({
       : null;
 
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div>
-          <p className="font-semibold">{program.name}</p>
+    <article className={cn(portalCard, "p-4")}>
+      <div className="flex items-start gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-600">
+          <HeartHandshake className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-slate-900">{program.name}</p>
           {program.description && (
-            <p className="mt-1 text-sm text-muted-foreground">{program.description}</p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+              {program.description}
+            </p>
           )}
         </div>
+      </div>
 
-        <div className="space-y-1.5">
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="font-mono font-medium tabular-nums">
-              {peso(program.raised_cash)}{" "}
-              <span className="font-sans font-normal text-muted-foreground">
-                {copy.raised}
-              </span>
+      <div className="mt-4 space-y-2">
+        <div className="flex items-baseline justify-between gap-3 text-xs">
+          <span className="font-mono font-semibold tabular-nums text-slate-900">
+            {peso(program.raised_cash)}{" "}
+            <span className="font-sans font-normal text-slate-500">{copy.raised}</span>
+          </span>
+          {program.target_amount && (
+            <span className="text-slate-500">
+              {copy.ofTarget} {peso(program.target_amount)}
             </span>
-            {program.target_amount && (
-              <span className="text-muted-foreground">
-                {copy.ofTarget} {peso(program.target_amount)}
-              </span>
-            )}
-          </div>
-          {progress !== null && (
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
           )}
         </div>
-
-        {mode === null ? (
-          <div className="flex gap-2 pt-1">
-            <Button
-              size="sm"
-              className="flex-1"
-              onClick={() => setMode("donate")}
-            >
-              <HandCoins className="mr-1.5 size-4" />
-              {copy.donate}
-            </Button>
-            {program.accepts_pledges && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                onClick={() => setMode("pledge")}
-              >
-                <HeartHandshake className="mr-1.5 size-4" />
-                {copy.pledge}
-              </Button>
-            )}
+        {progress !== null && (
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="portal-cta h-full rounded-full transition-[width]"
+              style={{ width: `${progress}%` }}
+            />
           </div>
-        ) : (
-          <form onSubmit={submit} className="space-y-3 border-t pt-3">
-            <div className="space-y-2">
-              <Label htmlFor={`amount-${program.id}`}>
-                {mode === "pledge" ? copy.pledgeAmount : copy.amount}
-              </Label>
-              <Input
+        )}
+      </div>
+
+      {mode === null ? (
+        <div className="mt-4 grid gap-2">
+          <button type="button" className={portalButton} onClick={() => setMode("donate")}>
+            <HandCoins className="size-5" />
+            {copy.donate}
+          </button>
+          {program.accepts_pledges && (
+            <button
+              type="button"
+              className={cn(portalGhostButton, "text-blue-700")}
+              onClick={() => setMode("pledge")}
+            >
+              {copy.pledge}
+            </button>
+          )}
+        </div>
+      ) : (
+        <form onSubmit={submit} className="portal-in mt-4 space-y-4 border-t border-slate-100 pt-4">
+          <div>
+            <label htmlFor={`amount-${program.id}`} className={portalLabel}>
+              {mode === "pledge" ? copy.pledgeAmount : copy.amount}
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-lg text-slate-400">
+                ₱
+              </span>
+              <input
                 id={`amount-${program.id}`}
                 inputMode="decimal"
                 autoFocus
-                className="h-11 font-mono"
+                placeholder="0.00"
+                className={cn(portalInput, "pl-10 font-mono text-lg")}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
               />
             </div>
+          </div>
 
-            {mode === "donate" ? (
-              <>
-                {gcashNumber && (
-                  <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-                    {copy.payStep1}{" "}
-                    <span className="font-mono font-semibold text-foreground">
-                      {gcashNumber}
-                    </span>
-                  </p>
-                )}
+          {mode === "donate" ? (
+            <>
+              {gcashNumber ? (
+                <GcashNumber number={gcashNumber} locale={locale} />
+              ) : (
+                <p className="text-sm text-slate-600">{copy.payStep1}</p>
+              )}
 
-                <div className="space-y-2">
-                  <Label htmlFor={`ref-${program.id}`}>{copy.referenceNumber}</Label>
-                  <Input
-                    id={`ref-${program.id}`}
-                    inputMode="numeric"
-                    className="h-11 font-mono"
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                  />
-                </div>
-
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void attach(file);
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 w-full justify-start"
-                  disabled={uploading}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  {uploading ? (
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                  ) : proofPath ? (
-                    <CheckCircle2 className="mr-2 size-4 text-emerald-600" />
-                  ) : (
-                    <Paperclip className="mr-2 size-4" />
-                  )}
-                  <span className="truncate">{proofName ?? copy.proof}</span>
-                </Button>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={anonymous}
-                    onCheckedChange={(v) => setAnonymous(v === true)}
-                  />
-                  {copy.giveAnonymously}
+              <div>
+                <label htmlFor={`ref-${program.id}`} className={portalLabel}>
+                  {copy.referenceNumber}
                 </label>
-              </>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor={`due-${program.id}`}>{copy.pledgeBy}</Label>
-                <Input
-                  id={`due-${program.id}`}
-                  type="date"
-                  className="h-11"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                <input
+                  id={`ref-${program.id}`}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className={cn(portalInput, "font-mono text-lg tracking-wide")}
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
                 />
+                <p className="mt-2 text-xs text-slate-500">{copy.referenceHint}</p>
               </div>
-            )}
 
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
+              <ProofUpload
+                label={copy.proof}
+                hint={copy.proofHint}
+                fileName={proofName}
+                uploading={uploading}
+                done={Boolean(proofPath)}
+                onPick={(file) => void attach(file)}
+              />
 
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" onClick={reset}>
-                {copy.cancel}
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1"
-                disabled={
-                  pending ||
-                  uploading ||
-                  !validAmount ||
-                  (mode === "donate" && reference.trim().length < 4)
-                }
-              >
-                {pending && <Loader2 className="mr-2 size-4 animate-spin" />}
-                {mode === "donate" ? copy.submitClaim : copy.pledge}
-              </Button>
+              <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl px-1 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="size-5 shrink-0 cursor-pointer accent-blue-600"
+                  checked={anonymous}
+                  onChange={(e) => setAnonymous(e.target.checked)}
+                />
+                {copy.giveAnonymously}
+              </label>
+            </>
+          ) : (
+            <div>
+              <label htmlFor={`due-${program.id}`} className={portalLabel}>
+                {copy.pledgeBy}
+              </label>
+              <input
+                id={`due-${program.id}`}
+                type="date"
+                className={portalInput}
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
             </div>
-          </form>
-        )}
-      </CardContent>
-    </Card>
+          )}
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded-2xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200"
+            >
+              {error}
+            </p>
+          )}
+
+          <div className="grid gap-2">
+            <button
+              type="submit"
+              className={portalButton}
+              disabled={
+                pending ||
+                uploading ||
+                !validAmount ||
+                (mode === "donate" && reference.trim().length < 4)
+              }
+            >
+              {pending && <Loader2 className="size-5 animate-spin" />}
+              {mode === "donate" ? copy.submitClaim : copy.pledge}
+            </button>
+            <button type="button" className={portalGhostButton} onClick={reset}>
+              {copy.cancel}
+            </button>
+          </div>
+        </form>
+      )}
+    </article>
   );
 }

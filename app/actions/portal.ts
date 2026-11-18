@@ -88,8 +88,8 @@ export async function submitClaim(input: unknown): Promise<ActionResult<string>>
   }
 
   revalidatePath("/portal");
-  revalidatePath("/portal/claims");
-  revalidatePath("/portal/balances");
+  revalidatePath("/portal/pay/history");
+  revalidatePath("/portal/pay");
   return { ok: true, data: data as string };
 }
 
@@ -126,7 +126,7 @@ export async function createPortalPledge(input: unknown): Promise<ActionResult> 
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath("/portal/give");
+  revalidatePath("/portal/pay/give");
   return { ok: true, data: undefined };
 }
 

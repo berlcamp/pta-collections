@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { createPortalClient } from "@/lib/portal/supabase";
 import type {
   PortalAccount,
@@ -34,8 +36,12 @@ import type {
  * refuses the JWT outright, that is a misconfigured signing secret, and every
  * page in the portal would otherwise render as "logged out" while the cookie
  * says otherwise. Surfacing it names the actual problem instead.
+ *
+ * Wrapped in React's per-request cache: the session layout reads it to gate,
+ * and the page under it reads it again for the guardian's name and the GCash
+ * number. One request, one query.
  */
-export async function getPortalAccount(): Promise<PortalAccount | null> {
+export const getPortalAccount = cache(async function getPortalAccount(): Promise<PortalAccount | null> {
   const supabase = await createPortalClient();
   const { data, error } = await supabase
     .from("v_portal_account")
@@ -52,7 +58,7 @@ export async function getPortalAccount(): Promise<PortalAccount | null> {
   }
 
   return (data ?? null) as PortalAccount | null;
-}
+});
 
 /** PostgREST answers a bad signature with a JWS error, not an empty result. */
 function isTokenRejected(error: { message?: string; code?: string }): boolean {

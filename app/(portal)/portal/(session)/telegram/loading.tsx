@@ -1,5 +1,5 @@
-import { CardListSkeleton } from "@/components/common/page-skeletons";
+import { PortalScreenSkeleton } from "@/components/portal/screen-skeleton";
 
 export default function Loading() {
-  return <CardListSkeleton />;
+  return <PortalScreenSkeleton hero="short" />;
 }

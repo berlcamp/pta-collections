@@ -32,6 +32,7 @@ import { GateFlow } from "@/components/marketing/gate-flow";
 import { GatePreview } from "@/components/marketing/gate-preview";
 import { LedgerPreview } from "@/components/marketing/ledger-preview";
 import { PortalPreview } from "@/components/marketing/portal-preview";
+import { PortalQr } from "@/components/marketing/portal-qr";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/auth/permissions";
 
 /**
@@ -443,13 +444,14 @@ export default function LandingPage() {
                   official receipt the counter issues.
                 </p>
 
-                <div className="mt-8 flex flex-wrap items-center gap-3">
+                <div className="mt-8 flex flex-wrap items-center gap-4">
                   <Button asChild size="lg">
                     <Link href="/portal/login">
                       Sign in with your parent card
                       <ArrowRight data-icon="inline-end" className="size-4" />
                     </Link>
                   </Button>
+                  <PortalQr />
                 </div>
 
                 <p className="mt-5 text-sm text-muted-foreground">

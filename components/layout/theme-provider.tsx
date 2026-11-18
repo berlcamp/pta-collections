@@ -14,10 +14,18 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
  * The cashier desk is light only. It has to be forced here rather than in its
  * own layout because next-themes ignores a nested provider, and `dark:` variants
  * key off the class on <html>, which no wrapper element can undo.
+ *
+ * The parent portal is light only for the same reason: it is drawn as a
+ * banking app on a fixed blue gradient, and a dark sheet under it would be a
+ * second design nobody asked for.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const lightOnly = pathname === "/cashier" || pathname.startsWith("/cashier/");
+  const lightOnly =
+    pathname === "/cashier" ||
+    pathname.startsWith("/cashier/") ||
+    pathname === "/portal" ||
+    pathname.startsWith("/portal/");
 
   return (
     <NextThemesProvider

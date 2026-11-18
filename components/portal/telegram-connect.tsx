@@ -17,9 +17,14 @@ import {
   setTelegramNotify,
   unlinkTelegram,
 } from "@/app/actions/portal";
-import { Button } from "@/components/ui/button";
+import {
+  portalButton,
+  portalCard,
+  portalGhostButton,
+} from "@/components/portal/styles";
 import { Switch } from "@/components/ui/switch";
 import { t } from "@/lib/portal/i18n";
+import { cn } from "@/lib/utils";
 import type { PortalLocale, PortalTelegramStatus } from "@/types/database.types";
 
 /**
@@ -125,18 +130,27 @@ export function TelegramConnect({
   if (status.is_linked) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-          <CheckCircle2 className="size-5 shrink-0 text-emerald-600" />
+        <div className="flex items-center gap-3 rounded-3xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white">
+            <CheckCircle2 className="size-6" />
+          </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">{copy.telegramLinked}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-base font-semibold text-emerald-900">{copy.telegramLinked}</p>
+            <p className="text-sm text-emerald-800/80">
               {status.notifying_children} / {status.total_children}
             </p>
           </div>
         </div>
 
-        <label className="flex items-center justify-between gap-3 rounded-xl border p-4">
-          <span className="text-sm font-medium">{copy.telegramNotifications}</span>
+        <label
+          className={cn(
+            portalCard,
+            "flex min-h-16 cursor-pointer items-center justify-between gap-3 px-4",
+          )}
+        >
+          <span className="text-[0.95rem] font-medium text-slate-900">
+            {copy.telegramNotifications}
+          </span>
           <Switch
             checked={status.telegram_active}
             disabled={pending}
@@ -149,10 +163,9 @@ export function TelegramConnect({
           />
         </label>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full text-muted-foreground"
+        <button
+          type="button"
+          className={portalGhostButton}
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
@@ -162,9 +175,9 @@ export function TelegramConnect({
             })
           }
         >
-          <Unlink className="mr-1.5 size-4" />
+          <Unlink className="size-4" />
           {copy.telegramUnlink}
-        </Button>
+        </button>
       </div>
     );
   }
@@ -172,9 +185,9 @@ export function TelegramConnect({
   return (
     <div className="space-y-3">
       {!link ? (
-        <Button
-          size="lg"
-          className="h-12 w-full text-base"
+        <button
+          type="button"
+          className={portalButton}
           disabled={pending || !status.bot_username}
           // Wrapped, not passed by reference: onClick hands the handler a
           // MouseEvent, which would land in `force` and make every first tap a
@@ -182,38 +195,41 @@ export function TelegramConnect({
           onClick={() => connect()}
         >
           {pending ? (
-            <Loader2 className="mr-2 size-4 animate-spin" />
+            <Loader2 className="size-5 animate-spin" />
           ) : (
-            <ExternalLink className="mr-2 size-4" />
+            <ExternalLink className="size-5" />
           )}
           {copy.telegramConnect}
-        </Button>
+        </button>
       ) : (
         // Once a link exists it is always on screen as a REAL anchor. Whether
         // the tab above opened, was blocked, or was closed by mistake, there is
         // one obvious thing to tap — and tapping a link is its own gesture, so
         // no popup blocker is involved.
-        <Button asChild size="lg" className="h-12 w-full text-base">
-          <a href={link} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="mr-2 size-4" />
-            {copy.telegramTapToOpen}
-          </a>
-        </Button>
+        <a href={link} target="_blank" rel="noopener noreferrer" className={portalButton}>
+          <ExternalLink className="size-5" />
+          {copy.telegramTapToOpen}
+        </a>
       )}
 
       {!status.bot_username && (
-        <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+        <p className="rounded-2xl bg-slate-100 p-3.5 text-sm text-slate-600">
           {copy.telegramNoBot}
         </p>
       )}
 
       {waiting && (
-        <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
-          <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
-          <p className="flex-1 text-sm">{copy.telegramWaiting}</p>
-          <Button variant="ghost" size="icon" onClick={() => router.refresh()}>
+        <div className="flex items-center gap-3 rounded-3xl bg-blue-50 p-4 ring-1 ring-blue-100">
+          <Loader2 className="size-5 shrink-0 animate-spin text-blue-600" />
+          <p className="flex-1 text-sm font-medium text-blue-900">{copy.telegramWaiting}</p>
+          <button
+            type="button"
+            aria-label="Refresh"
+            className="grid size-11 cursor-pointer place-items-center rounded-full text-blue-700 hover:bg-blue-100"
+            onClick={() => router.refresh()}
+          >
             <RefreshCw className="size-4" />
-          </Button>
+          </button>
         </div>
       )}
 
@@ -224,30 +240,32 @@ export function TelegramConnect({
           moment it was needed. */}
       {link && (
         <div className="space-y-1.5">
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-slate-500">
             {copy.telegramDidNotOpen}
           </p>
-          <p className="break-all rounded-lg bg-muted p-3 text-center font-mono text-xs">
+          <p className="select-all break-all rounded-2xl bg-white p-3.5 text-center font-mono text-xs text-slate-700 ring-1 ring-slate-900/5">
             {link}
           </p>
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-slate-500">
             {copy.telegramLinkExpiresIn}
           </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-muted-foreground"
+          <button
+            type="button"
+            className={portalGhostButton}
             disabled={pending}
             onClick={() => connect(true)}
           >
-            {pending && <Loader2 className="mr-2 size-4 animate-spin" />}
+            {pending && <Loader2 className="size-4 animate-spin" />}
             {copy.telegramNewLink}
-          </Button>
+          </button>
         </div>
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-2xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200"
+        >
           {error}
         </p>
       )}

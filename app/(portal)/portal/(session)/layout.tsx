@@ -1,8 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { LocaleSwitch } from "@/components/portal/locale-switch";
-import { PortalNav } from "@/components/portal/portal-nav";
-import { SignOutButton } from "@/components/portal/sign-out-button";
 import { getPortalAccount } from "@/lib/data/portal";
 import { requirePortalSession } from "@/lib/portal/session";
 
@@ -32,13 +29,16 @@ export const dynamic = "force-dynamic";
  *     therefore lands back at sign-in even while its cookie is still valid,
  *     which is the whole point of not trusting the token.
  *  3. The bootstrap PIN is still in place -> replace it before anything else.
+ *
+ * getPortalAccount() is request-cached, so the page below reading it again for
+ * the guardian's name costs nothing.
  */
 export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requirePortalSession();
+  await requirePortalSession();
   const account = await getPortalAccount();
 
   if (!account) redirect("/portal/login");
@@ -51,26 +51,7 @@ export default async function PortalLayout({
     redirect("/portal/set-pin");
   }
 
-  return (
-    <div className="flex min-h-svh flex-col">
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-14 max-w-2xl items-center gap-3 px-4">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold leading-tight">
-              {account.guardian_name}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {account.school_name}
-            </p>
-          </div>
-          <LocaleSwitch locale={session.locale} />
-          <SignOutButton locale={session.locale} />
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-5">{children}</main>
-
-      <PortalNav locale={session.locale} />
-    </div>
-  );
+  // No chrome here: each screen draws its own hero and back arrow
+  // (components/portal/screen.tsx). There is no tab bar by design.
+  return children;
 }

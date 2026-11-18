@@ -1,24 +1,27 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
-import { CheckCircle2, Loader2, Paperclip } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { Check, Info, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { submitClaim, uploadProof } from "@/app/actions/portal";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { GcashNumber } from "@/components/portal/gcash-number";
+import { ProofUpload } from "@/components/portal/proof-upload";
+import {
+  portalButton,
+  portalCard,
+  portalInput,
+  portalLabel,
+} from "@/components/portal/styles";
 import { peso, t } from "@/lib/portal/i18n";
+import { cn } from "@/lib/utils";
 import type { PortalBalance, PortalLocale } from "@/types/database.types";
 
 /**
  * Select fees, then say what you sent.
  *
- * The two halves are one screen on purpose. Splitting "choose what to pay" from
+ * The steps are one screen on purpose. Splitting "choose what to pay" from
  * "tell us the reference" across two routes loses the total a parent is holding
  * in their head while they switch to GCash — and the total is the number they
  * have to type into GCash exactly.
@@ -44,7 +47,6 @@ export function PayForm({
   const [proofPath, setProofPath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   // A claim settles ONE student — pta.payments names a single student and a
   // single enrollment, so a basket spanning two children could not be posted.
@@ -113,149 +115,162 @@ export function PayForm({
       }
 
       toast.success(copy.claimSubmitted);
-      router.push("/portal/claims");
+      router.push("/portal/pay/history");
       router.refresh();
     });
   }
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <p className="text-sm text-muted-foreground">{copy.selectFees}</p>
-
-      <Card>
-        <CardContent className="divide-y p-0">
+      {/* ── 1. Choose ─────────────────────────────────────────────────── */}
+      <section className={cn(portalCard, "overflow-hidden")}>
+        <StepHeading n={1} title={copy.stepChoose} />
+        <ul className="divide-y divide-slate-100">
           {balances.map((balance) => {
             const checked = selected.has(balance.charge_id);
             const otherChild = Boolean(studentId && balance.student_id !== studentId);
             return (
-              <label
-                key={balance.charge_id}
-                className="flex cursor-pointer items-center gap-3 p-3"
-              >
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={() => toggle(balance)}
-                  aria-label={balance.fee_type_name}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {balance.fee_type_name}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {balance.student_name}
-                    {balance.due_date && ` · ${copy.feeDue} ${balance.due_date}`}
-                  </p>
-                </div>
-                <span
-                  className={
-                    otherChild
-                      ? "font-mono text-sm tabular-nums text-muted-foreground/50"
-                      : "font-mono text-sm tabular-nums"
-                  }
+              <li key={balance.charge_id}>
+                <label
+                  className={cn(
+                    "flex min-h-16 cursor-pointer items-center gap-3 px-4 py-3 transition-colors",
+                    checked ? "bg-blue-50/70" : "hover:bg-slate-50 active:bg-slate-100",
+                  )}
                 >
-                  {peso(balance.balance)}
-                </span>
-              </label>
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={checked}
+                    onChange={() => toggle(balance)}
+                  />
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "grid size-6 shrink-0 place-items-center rounded-full ring-2 transition-colors peer-focus-visible:ring-4 peer-focus-visible:ring-blue-300",
+                      checked
+                        ? "portal-cta text-white ring-transparent"
+                        : "bg-white ring-slate-300",
+                    )}
+                  >
+                    {checked && <Check className="size-3.5" strokeWidth={3} />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[0.95rem] font-medium text-slate-900">
+                      {balance.fee_type_name}
+                    </span>
+                    <span className="block truncate text-xs text-slate-500">
+                      {balance.student_name}
+                      {balance.due_date && ` · ${copy.feeDue} ${balance.due_date}`}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 font-mono text-[0.95rem] font-semibold tabular-nums",
+                      otherChild ? "text-slate-300" : "text-slate-900",
+                    )}
+                  >
+                    {peso(balance.balance)}
+                  </span>
+                </label>
+              </li>
             );
           })}
-        </CardContent>
-      </Card>
+        </ul>
+      </section>
+
+      {chosen.length === 0 && (
+        <p className="flex items-center justify-center gap-2 px-4 py-2 text-center text-sm text-slate-500">
+          <Info className="size-4 shrink-0" />
+          {copy.selectFees}
+        </p>
+      )}
 
       {chosen.length > 0 && (
-        <Card className="border-primary/40">
-          <CardContent className="space-y-4 p-4">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm font-medium">{copy.amount}</span>
-              <span className="font-mono text-2xl font-semibold tabular-nums">
-                {peso(total)}
-              </span>
+        <>
+          {/* ── 2. Send ─────────────────────────────────────────────── */}
+          <section className={cn(portalCard, "portal-in")}>
+            <StepHeading n={2} title={copy.stepSend} />
+            <div className="space-y-4 px-4 pb-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm text-slate-600">{copy.totalToSend}</span>
+                <span className="font-mono text-[1.75rem] font-semibold tabular-nums text-slate-900">
+                  {peso(total)}
+                </span>
+              </div>
+              {gcashNumber && <GcashNumber number={gcashNumber} locale={locale} />}
+              <ol className="space-y-1.5 text-sm text-slate-600">
+                {!gcashNumber && <li>• {copy.payStep1}</li>}
+                <li>• {copy.payStep2}</li>
+                <li>• {copy.payStep3}</li>
+              </ol>
             </div>
+          </section>
 
-            <ol className="space-y-1.5 rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-              <li>
-                1. {copy.payStep1}
-                {gcashNumber && (
-                  <span className="ml-1 font-mono font-semibold text-foreground">
-                    {gcashNumber}
-                  </span>
-                )}
-              </li>
-              <li>2. {copy.payStep2}</li>
-              <li>3. {copy.payStep3}</li>
-            </ol>
+          {/* ── 3. Confirm ──────────────────────────────────────────── */}
+          <section className={cn(portalCard, "portal-in")}>
+            <StepHeading n={3} title={copy.stepConfirm} />
+            <div className="space-y-4 px-4 pb-4">
+              <div>
+                <label htmlFor="reference" className={portalLabel}>
+                  {copy.referenceNumber}
+                </label>
+                <input
+                  id="reference"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className={cn(portalInput, "font-mono text-lg tracking-wide")}
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+                <p className="mt-2 text-xs text-slate-500">{copy.referenceHint}</p>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="reference">{copy.referenceNumber}</Label>
-              <Input
-                id="reference"
-                inputMode="numeric"
-                autoComplete="off"
-                className="h-11 font-mono"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
+              <ProofUpload
+                label={copy.proof}
+                hint={copy.proofHint}
+                fileName={proofName}
+                uploading={uploading}
+                done={Boolean(proofPath)}
+                onPick={(file) => void attach(file)}
               />
-              <p className="text-xs text-muted-foreground">{copy.referenceHint}</p>
-            </div>
 
-            <div className="space-y-2">
-              <Label>{copy.proof}</Label>
-              <input
-                ref={fileInput}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void attach(file);
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 w-full justify-start"
-                disabled={uploading}
-                onClick={() => fileInput.current?.click()}
-              >
-                {uploading ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                ) : proofPath ? (
-                  <CheckCircle2 className="mr-2 size-4 text-emerald-600" />
-                ) : (
-                  <Paperclip className="mr-2 size-4" />
-                )}
-                <span className="truncate">{proofName ?? copy.proof}</span>
-              </Button>
-              <p className="text-xs text-muted-foreground">{copy.proofHint}</p>
-            </div>
-
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-              {copy.balanceNotYetUpdated}
-            </p>
-
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
+              <p className="flex gap-2 rounded-2xl bg-amber-50 p-3.5 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-200">
+                <ShieldCheck className="mt-px size-4 shrink-0" />
+                {copy.balanceNotYetUpdated}
               </p>
-            )}
 
-            <Button
-              type="submit"
-              size="lg"
-              className="h-12 w-full text-base"
-              disabled={pending || uploading || reference.trim().length < 4}
-            >
-              {pending && <Loader2 className="mr-2 size-4 animate-spin" />}
-              {copy.submitClaim}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-2xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200"
+                >
+                  {error}
+                </p>
+              )}
 
-      {chosen.length === 0 && balances.length > 0 && (
-        <Badge variant="secondary" className="w-full justify-center py-2">
-          {copy.selectFees}
-        </Badge>
+              <button
+                type="submit"
+                className={portalButton}
+                disabled={pending || uploading || reference.trim().length < 4}
+              >
+                {pending && <Loader2 className="size-5 animate-spin" />}
+                {copy.submitClaim} · {peso(total)}
+              </button>
+            </div>
+          </section>
+        </>
       )}
     </form>
+  );
+}
+
+function StepHeading({ n, title }: { n: number; title: string }) {
+  return (
+    <h2 className="flex items-center gap-2.5 px-4 pb-3 pt-4 text-[0.95rem] font-semibold text-slate-900">
+      <span className="grid size-6 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+        {n}
+      </span>
+      {title}
+    </h2>
   );
 }

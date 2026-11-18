@@ -1,15 +1,8 @@
 import { redirect } from "next/navigation";
-import { Nfc } from "lucide-react";
+import { IdCard, ShieldCheck } from "lucide-react";
 
 import { PortalLoginForm } from "@/components/portal/login-form";
 import { LocaleSwitch } from "@/components/portal/locale-switch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { getPortalAccount } from "@/lib/data/portal";
 import {
   clearPortalSession,
@@ -20,6 +13,14 @@ import type { PortalLocale } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The parents' own front door.
+ *
+ * Separate from the staff sign-in (/login, Google by invitation) on purpose,
+ * and no longer linked from it: a parent reaches this page from the landing
+ * page's link or its QR code, usually by pointing a phone at a poster. So it
+ * is drawn as the opening screen of a banking app, full-bleed blue.
+ */
 export default async function PortalLoginPage({
   searchParams,
 }: {
@@ -46,28 +47,35 @@ export default async function PortalLoginPage({
   const copy = t(locale);
 
   return (
-    <div className="grid min-h-svh place-items-center p-5">
-      <div className="w-full max-w-sm space-y-4">
-        <Card className="shadow-lg">
-          <CardHeader className="items-center gap-2 text-center">
-            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-              <Nfc className="size-7" />
-            </div>
-            <CardTitle className="text-xl">{copy.signInTitle}</CardTitle>
-            <CardDescription className="text-pretty">
-              {copy.signInLead}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* The "forgot your PIN" help lives inside the form, not here:
-                whether this school uses a PIN at all is only known once a card
-                has been submitted (0017). */}
-            <PortalLoginForm locale={locale} />
-          </CardContent>
-        </Card>
-        <div className="flex justify-center">
+    <div className="portal-gradient min-h-svh text-white">
+      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 pb-[max(env(safe-area-inset-bottom),2rem)] pt-[max(env(safe-area-inset-top),0.75rem)]">
+        <div className="flex h-14 items-center justify-end">
           <LocaleSwitch locale={locale} variant="link" />
         </div>
+
+        <div className="portal-in mt-6 flex flex-col items-center text-center sm:mt-10">
+          <div className="grid size-20 place-items-center rounded-[1.75rem] bg-white shadow-xl shadow-blue-950/30">
+            <IdCard className="size-10 text-blue-700" strokeWidth={1.75} />
+          </div>
+          <h1 className="mt-6 text-[1.75rem] font-semibold leading-tight tracking-tight">
+            {copy.signInTitle}
+          </h1>
+          <p className="mt-2 max-w-xs text-[0.95rem] leading-relaxed text-blue-100">
+            {copy.signInLead}
+          </p>
+        </div>
+
+        <div className="portal-in mt-8 rounded-[1.75rem] bg-white p-5 text-slate-900 shadow-2xl shadow-blue-950/40 [animation-delay:60ms]">
+          {/* The "forgot your PIN" help lives inside the form, not here:
+              whether this school uses a PIN at all is only known once a card
+              has been submitted (0017). */}
+          <PortalLoginForm locale={locale} />
+        </div>
+
+        <p className="mx-auto mt-auto flex max-w-xs items-start gap-2 pt-8 text-left text-xs leading-relaxed text-blue-100/90">
+          <ShieldCheck className="mt-px size-4 shrink-0" />
+          {copy.secureNote}
+        </p>
       </div>
     </div>
   );

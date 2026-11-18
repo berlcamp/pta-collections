@@ -6,9 +6,12 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { portalChangePin } from "@/app/actions/portal-auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  portalButton,
+  portalInput,
+  portalLabel,
+} from "@/components/portal/styles";
+import { cn } from "@/lib/utils";
 import { t } from "@/lib/portal/i18n";
 import type { PortalLocale } from "@/types/database.types";
 
@@ -71,22 +74,24 @@ export function SetPinForm({ locale }: { locale: PortalLocale }) {
       />
 
       {(error || mismatch) && (
-        <p role="alert" className="text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-2xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200"
+        >
           {error ?? copy.pinMismatch}
         </p>
       )}
 
-      <Button
+      <button
         type="submit"
-        size="lg"
-        className="h-12 w-full text-base"
+        className={portalButton}
         disabled={
           pending || current.length !== 6 || next.length !== 6 || next !== confirm
         }
       >
-        {pending && <Loader2 className="mr-2 size-4 animate-spin" />}
+        {pending && <Loader2 className="size-5 animate-spin" />}
         {copy.savePin}
-      </Button>
+      </button>
     </form>
   );
 }
@@ -107,17 +112,19 @@ function Field({
   invalid?: boolean;
 }) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
+    <div>
+      <label htmlFor={id} className={portalLabel}>
+        {label}
+      </label>
+      <input
         id={id}
         type="password"
         inputMode="numeric"
         autoComplete="new-password"
         autoFocus={autoFocus}
         aria-invalid={invalid}
-        placeholder="······"
-        className="h-12 text-center font-mono text-lg tracking-[0.5em]"
+        placeholder="••••••"
+        className={cn(portalInput, "text-center font-mono text-xl tracking-[0.5em]")}
         value={value}
         onChange={(e) => onChange(digits(e.target.value))}
       />

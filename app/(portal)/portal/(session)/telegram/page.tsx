@@ -1,15 +1,16 @@
-import { Bell, Camera, MessageCircle, Send, ShieldCheck } from "lucide-react";
+import { Camera, ChevronDown, MessageCircle, Send, ShieldCheck } from "lucide-react";
 
-import { TelegramConnect } from "@/components/portal/telegram-connect";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Card, CardContent } from "@/components/ui/card";
+  PortalScreen,
+  PortalTopBar,
+  SectionTitle,
+} from "@/components/portal/screen";
+import { portalCard } from "@/components/portal/styles";
+import { TelegramConnect } from "@/components/portal/telegram-connect";
 import { getPortalTelegram } from "@/lib/data/portal";
 import { t } from "@/lib/portal/i18n";
 import { requirePortalSession } from "@/lib/portal/session";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -113,36 +114,41 @@ export default async function PortalTelegramPage() {
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight">
-          {copy.telegramTitle}
-        </h1>
-        <p className="text-sm text-muted-foreground">{copy.telegramLead}</p>
-      </div>
-
+    <PortalScreen
+      hero={
+        <>
+          <PortalTopBar backHref="/portal" backLabel={copy.back} title={copy.telegramTile} />
+          <div className="mt-2 flex items-start gap-4 px-1">
+            <p className="flex-1 text-[0.95rem] leading-relaxed text-blue-100">
+              {copy.telegramLead}
+            </p>
+            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-sky-500 shadow-lg shadow-blue-950/30">
+              <Send className="size-7" />
+            </span>
+          </div>
+        </>
+      }
+    >
       {!status.is_linked && (
-        <ol className="space-y-3">
+        <ol className={cn(portalCard, "space-y-1 p-4")}>
           {steps.map((step, index) => {
             const Icon = step.icon;
             return (
               <li key={step.title} className="flex gap-3">
                 <div className="relative flex flex-col items-center">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                  <span className="portal-cta grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white">
                     {index + 1}
                   </span>
                   {index < steps.length - 1 && (
-                    <span aria-hidden className="mt-1 w-px flex-1 bg-border" />
+                    <span aria-hidden className="my-1 w-0.5 flex-1 rounded-full bg-blue-100" />
                   )}
                 </div>
-                <div className="pb-2">
-                  <p className="flex items-center gap-1.5 text-sm font-medium">
-                    <Icon className="size-4 text-muted-foreground" />
+                <div className="pb-3">
+                  <p className="flex items-center gap-1.5 pt-1.5 text-[0.95rem] font-semibold text-slate-900">
+                    <Icon className="size-4 text-blue-600" />
                     {step.title}
                   </p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {step.body}
-                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{step.body}</p>
                 </div>
               </li>
             );
@@ -152,37 +158,27 @@ export default async function PortalTelegramPage() {
 
       <TelegramConnect status={status} locale={session.locale} />
 
-      <Card className="border-dashed">
-        <CardContent className="flex gap-3 p-4">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {session.locale === "tl"
-              ? "Ang paaralan lang ang nagpapadala ng mensaheng ito. Hindi kayo mapapadalhan ng bot ng kahit anong iba, at hindi nakikita ng ibang magulang ang inyong chat."
-              : "Only the school sends these messages. The bot cannot send you anything else, and no other parent can see your chat."}
-          </p>
-        </CardContent>
-      </Card>
+      <p className="flex gap-2.5 px-2 text-xs leading-relaxed text-slate-500">
+        <ShieldCheck className="mt-px size-4 shrink-0" />
+        {session.locale === "tl"
+          ? "Ang paaralan lang ang nagpapadala ng mensaheng ito. Hindi kayo mapapadalhan ng bot ng kahit anong iba, at hindi nakikita ng ibang magulang ang inyong chat."
+          : "Only the school sends these messages. The bot cannot send you anything else, and no other parent can see your chat."}
+      </p>
 
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          <Bell className="size-3.5" />
-          {session.locale === "tl" ? "Kung may problema" : "If something goes wrong"}
-        </h2>
-        <Card>
-          <CardContent className="divide-y p-0">
-            {faqs.map((faq) => (
-              <Collapsible key={faq.q}>
-                <CollapsibleTrigger className="w-full px-4 py-3 text-left text-sm font-medium hover:bg-accent/50">
-                  {faq.q}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-4 pb-3 text-sm leading-relaxed text-muted-foreground">
-                  {faq.a}
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
-    </div>
+      <SectionTitle>
+        {session.locale === "tl" ? "Kung may problema" : "If something goes wrong"}
+      </SectionTitle>
+      <div className={cn(portalCard, "divide-y divide-slate-100 overflow-hidden")}>
+        {faqs.map((faq) => (
+          <details key={faq.q} className="group">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 text-[0.95rem] font-medium text-slate-900 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+              <span className="flex-1">{faq.q}</span>
+              <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+            <p className="px-4 pb-4 text-sm leading-relaxed text-slate-600">{faq.a}</p>
+          </details>
+        ))}
+      </div>
+    </PortalScreen>
   );
 }
