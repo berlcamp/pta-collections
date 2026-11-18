@@ -129,55 +129,60 @@ export default async function PortalTelegramPage() {
         </>
       }
     >
-      {!status.is_linked && (
-        <ol className={cn(portalCard, "space-y-1 p-4")}>
-          {steps.map((step, index) => {
-            const Icon = step.icon;
-            return (
-              <li key={step.title} className="flex gap-3">
-                <div className="relative flex flex-col items-center">
-                  <span className="portal-cta grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white">
-                    {index + 1}
-                  </span>
-                  {index < steps.length - 1 && (
-                    <span aria-hidden className="my-1 w-0.5 flex-1 rounded-full bg-blue-100" />
-                  )}
-                </div>
-                <div className="pb-3">
-                  <p className="flex items-center gap-1.5 pt-1.5 text-[0.95rem] font-semibold text-slate-900">
-                    <Icon className="size-4 text-blue-600" />
-                    {step.title}
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{step.body}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+        <div className="space-y-4">
+          {!status.is_linked && (
+            <ol className={cn(portalCard, "space-y-1 p-4")}>
+              {steps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <li key={step.title} className="flex gap-3">
+                    <div className="relative flex flex-col items-center">
+                      <span className="portal-cta grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white">
+                        {index + 1}
+                      </span>
+                      {index < steps.length - 1 && (
+                        <span aria-hidden className="my-1 w-0.5 flex-1 rounded-full bg-blue-100" />
+                      )}
+                    </div>
+                    <div className="pb-3">
+                      <p className="flex items-center gap-1.5 pt-1.5 text-[0.95rem] font-semibold text-slate-900">
+                        <Icon className="size-4 text-blue-600" />
+                        {step.title}
+                      </p>
+                      <p className="mt-1 text-sm leading-relaxed text-slate-600">{step.body}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
 
-      <TelegramConnect status={status} locale={session.locale} />
+          <TelegramConnect status={status} locale={session.locale} />
+        </div>
+        <div className="space-y-4">
+          <p className="flex gap-2.5 px-2 text-xs leading-relaxed text-slate-500">
+            <ShieldCheck className="mt-px size-4 shrink-0" />
+            {session.locale === "tl"
+              ? "Ang paaralan lang ang nagpapadala ng mensaheng ito. Hindi kayo mapapadalhan ng bot ng kahit anong iba, at hindi nakikita ng ibang magulang ang inyong chat."
+              : "Only the school sends these messages. The bot cannot send you anything else, and no other parent can see your chat."}
+          </p>
 
-      <p className="flex gap-2.5 px-2 text-xs leading-relaxed text-slate-500">
-        <ShieldCheck className="mt-px size-4 shrink-0" />
-        {session.locale === "tl"
-          ? "Ang paaralan lang ang nagpapadala ng mensaheng ito. Hindi kayo mapapadalhan ng bot ng kahit anong iba, at hindi nakikita ng ibang magulang ang inyong chat."
-          : "Only the school sends these messages. The bot cannot send you anything else, and no other parent can see your chat."}
-      </p>
-
-      <SectionTitle>
-        {session.locale === "tl" ? "Kung may problema" : "If something goes wrong"}
-      </SectionTitle>
-      <div className={cn(portalCard, "divide-y divide-slate-100 overflow-hidden")}>
-        {faqs.map((faq) => (
-          <details key={faq.q} className="group">
-            <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 text-[0.95rem] font-medium text-slate-900 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
-              <span className="flex-1">{faq.q}</span>
-              <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
-            </summary>
-            <p className="px-4 pb-4 text-sm leading-relaxed text-slate-600">{faq.a}</p>
-          </details>
-        ))}
+          <SectionTitle className="lg:pt-0">
+            {session.locale === "tl" ? "Kung may problema" : "If something goes wrong"}
+          </SectionTitle>
+          <div className={cn(portalCard, "divide-y divide-slate-100 overflow-hidden")}>
+            {faqs.map((faq) => (
+              <details key={faq.q} className="group">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 text-[0.95rem] font-medium text-slate-900 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                  <span className="flex-1">{faq.q}</span>
+                  <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <p className="px-4 pb-4 text-sm leading-relaxed text-slate-600">{faq.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
       </div>
     </PortalScreen>
   );

@@ -121,7 +121,12 @@ export function PayForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    // One column on a phone; on a laptop the list sits on the left and the
+    // steps that follow from it sit beside it, so the total stays in view.
+    <form
+      onSubmit={submit}
+      className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0"
+    >
       {/* ── 1. Choose ─────────────────────────────────────────────────── */}
       <section className={cn(portalCard, "overflow-hidden")}>
         <StepHeading n={1} title={copy.stepChoose} />
@@ -178,88 +183,90 @@ export function PayForm({
         </ul>
       </section>
 
-      {chosen.length === 0 && (
-        <p className="flex items-center justify-center gap-2 px-4 py-2 text-center text-sm text-slate-500">
-          <Info className="size-4 shrink-0" />
-          {copy.selectFees}
-        </p>
-      )}
+      <div className="space-y-4">
+        {chosen.length === 0 && (
+          <p className="flex items-center justify-center gap-2 px-4 py-2 text-center text-sm text-slate-500 lg:rounded-3xl lg:border-2 lg:border-dashed lg:border-slate-200 lg:py-16">
+            <Info className="size-4 shrink-0" />
+            {copy.selectFees}
+          </p>
+        )}
 
-      {chosen.length > 0 && (
-        <>
-          {/* ── 2. Send ─────────────────────────────────────────────── */}
-          <section className={cn(portalCard, "portal-in")}>
-            <StepHeading n={2} title={copy.stepSend} />
-            <div className="space-y-4 px-4 pb-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm text-slate-600">{copy.totalToSend}</span>
-                <span className="font-mono text-[1.75rem] font-semibold tabular-nums text-slate-900">
-                  {peso(total)}
-                </span>
+        {chosen.length > 0 && (
+          <>
+            {/* ── 2. Send ─────────────────────────────────────────────── */}
+            <section className={cn(portalCard, "portal-in")}>
+              <StepHeading n={2} title={copy.stepSend} />
+              <div className="space-y-4 px-4 pb-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-slate-600">{copy.totalToSend}</span>
+                  <span className="font-mono text-[1.75rem] font-semibold tabular-nums text-slate-900">
+                    {peso(total)}
+                  </span>
+                </div>
+                {gcashNumber && <GcashNumber number={gcashNumber} locale={locale} />}
+                <ol className="space-y-1.5 text-sm text-slate-600">
+                  {!gcashNumber && <li>• {copy.payStep1}</li>}
+                  <li>• {copy.payStep2}</li>
+                  <li>• {copy.payStep3}</li>
+                </ol>
               </div>
-              {gcashNumber && <GcashNumber number={gcashNumber} locale={locale} />}
-              <ol className="space-y-1.5 text-sm text-slate-600">
-                {!gcashNumber && <li>• {copy.payStep1}</li>}
-                <li>• {copy.payStep2}</li>
-                <li>• {copy.payStep3}</li>
-              </ol>
-            </div>
-          </section>
+            </section>
 
-          {/* ── 3. Confirm ──────────────────────────────────────────── */}
-          <section className={cn(portalCard, "portal-in")}>
-            <StepHeading n={3} title={copy.stepConfirm} />
-            <div className="space-y-4 px-4 pb-4">
-              <div>
-                <label htmlFor="reference" className={portalLabel}>
-                  {copy.referenceNumber}
-                </label>
-                <input
-                  id="reference"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className={cn(portalInput, "font-mono text-lg tracking-wide")}
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
+            {/* ── 3. Confirm ──────────────────────────────────────────── */}
+            <section className={cn(portalCard, "portal-in")}>
+              <StepHeading n={3} title={copy.stepConfirm} />
+              <div className="space-y-4 px-4 pb-4">
+                <div>
+                  <label htmlFor="reference" className={portalLabel}>
+                    {copy.referenceNumber}
+                  </label>
+                  <input
+                    id="reference"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className={cn(portalInput, "font-mono text-lg tracking-wide")}
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                  />
+                  <p className="mt-2 text-xs text-slate-500">{copy.referenceHint}</p>
+                </div>
+
+                <ProofUpload
+                  label={copy.proof}
+                  hint={copy.proofHint}
+                  fileName={proofName}
+                  uploading={uploading}
+                  done={Boolean(proofPath)}
+                  onPick={(file) => void attach(file)}
                 />
-                <p className="mt-2 text-xs text-slate-500">{copy.referenceHint}</p>
-              </div>
 
-              <ProofUpload
-                label={copy.proof}
-                hint={copy.proofHint}
-                fileName={proofName}
-                uploading={uploading}
-                done={Boolean(proofPath)}
-                onPick={(file) => void attach(file)}
-              />
-
-              <p className="flex gap-2 rounded-2xl bg-amber-50 p-3.5 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-200">
-                <ShieldCheck className="mt-px size-4 shrink-0" />
-                {copy.balanceNotYetUpdated}
-              </p>
-
-              {error && (
-                <p
-                  role="alert"
-                  className="rounded-2xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200"
-                >
-                  {error}
+                <p className="flex gap-2 rounded-2xl bg-amber-50 p-3.5 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-200">
+                  <ShieldCheck className="mt-px size-4 shrink-0" />
+                  {copy.balanceNotYetUpdated}
                 </p>
-              )}
 
-              <button
-                type="submit"
-                className={portalButton}
-                disabled={pending || uploading || reference.trim().length < 4}
-              >
-                {pending && <Loader2 className="size-5 animate-spin" />}
-                {copy.submitClaim} · {peso(total)}
-              </button>
-            </div>
-          </section>
-        </>
-      )}
+                {error && (
+                  <p
+                    role="alert"
+                    className="rounded-2xl bg-red-50 p-3.5 text-sm text-red-700 ring-1 ring-red-200"
+                  >
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className={portalButton}
+                  disabled={pending || uploading || reference.trim().length < 4}
+                >
+                  {pending && <Loader2 className="size-5 animate-spin" />}
+                  {copy.submitClaim} · {peso(total)}
+                </button>
+              </div>
+            </section>
+          </>
+        )}
+      </div>
     </form>
   );
 }

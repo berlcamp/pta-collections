@@ -48,8 +48,8 @@ export default async function PortalLoginPage({
 
   return (
     <div className="portal-gradient min-h-svh text-white">
-      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 pb-[max(env(safe-area-inset-bottom),2rem)] pt-[max(env(safe-area-inset-top),0.75rem)]">
-        <div className="flex h-14 items-center justify-end">
+      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 md:justify-center md:py-12 pb-[max(env(safe-area-inset-bottom),2rem)] pt-[max(env(safe-area-inset-top),0.75rem)]">
+        <div className="flex h-14 items-center justify-end md:fixed md:right-8 md:top-6">
           <LocaleSwitch locale={locale} variant="link" />
         </div>
 
@@ -72,7 +72,7 @@ export default async function PortalLoginPage({
           <PortalLoginForm locale={locale} />
         </div>
 
-        <p className="mx-auto mt-auto flex max-w-xs items-start gap-2 pt-8 text-left text-xs leading-relaxed text-blue-100/90">
+        <p className="mx-auto mt-auto flex max-w-xs md:mt-0 items-start gap-2 pt-8 text-left text-xs leading-relaxed text-blue-100/90">
           <ShieldCheck className="mt-px size-4 shrink-0" />
           {copy.secureNote}
         </p>

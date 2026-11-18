@@ -6,8 +6,8 @@ import type { Metadata, Viewport } from "next";
  * Deliberately NOT the app shell. Parents get no sidebar, no school switcher,
  * no breadcrumb rail and no tab bar — those exist to help staff move between
  * modules, and a parent has two jobs: pay, and connect Telegram. Each screen
- * draws its own blue hero (components/portal/screen.tsx); this only paints
- * what sits behind the phone-width column on a laptop.
+ * draws its own blue hero (components/portal/screen.tsx), and on a laptop
+ * the screen itself paints the whole page blue.
  */
 export const metadata: Metadata = {
   title: "Parent Portal",
@@ -28,7 +28,7 @@ export default function PortalRootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="portal-sheet min-h-svh text-slate-900 md:bg-slate-200">
+    <div className="portal-sheet min-h-svh text-slate-900">
       {children}
     </div>
   );

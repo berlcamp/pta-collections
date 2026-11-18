@@ -78,13 +78,13 @@ export default async function PortalHomePage() {
             <SignOutButton locale={session.locale} />
           </div>
 
-          <div className="mt-5 rounded-3xl bg-white/10 p-5 ring-1 ring-white/20 backdrop-blur-sm">
+          <div className="mt-5 rounded-3xl bg-white/10 p-5 ring-1 ring-white/20 backdrop-blur-sm md:p-7">
             <p className="flex items-center gap-1.5 text-xs font-medium text-blue-100">
               <School className="size-3.5" />
               <span className="truncate">{account?.school_name}</span>
             </p>
             <p className="mt-3 text-sm text-blue-100">{copy.totalDue}</p>
-            <p className="mt-0.5 font-mono text-[2.125rem] font-semibold leading-tight tracking-tight tabular-nums">
+            <p className="mt-0.5 font-mono text-[2.125rem] font-semibold leading-tight tracking-tight tabular-nums md:text-5xl">
               {peso(totalDue)}
             </p>
             <p className="mt-2 flex items-center gap-1.5 text-xs text-blue-100/90">
@@ -96,7 +96,7 @@ export default async function PortalHomePage() {
         </>
       }
     >
-      <nav aria-label={copy.menu} className="grid gap-3">
+      <nav aria-label={copy.menu} className="grid gap-3 md:grid-cols-2 md:gap-4">
         <ActionTile
           href="/portal/pay"
           icon={Wallet}
@@ -124,72 +124,74 @@ export default async function PortalHomePage() {
         <EmptyState icon={Users}>{copy.noChildren}</EmptyState>
       )}
 
-      {children.map((child) => {
-        const owes = Number(child.outstanding_balance) > 0;
-        return (
-          <article key={child.student_id} className={cn(portalCard, "overflow-hidden")}>
-            <div className="flex items-center gap-3 p-4">
-              <div
-                aria-hidden
-                className="grid size-12 shrink-0 place-items-center rounded-2xl bg-blue-50 text-sm font-semibold text-blue-700"
-              >
-                {initials(child.full_name)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-slate-900">{child.full_name}</p>
-                <p className="truncate text-xs text-slate-500">
-                  {[child.grade_level, child.section_name].filter(Boolean).join(" · ") ||
-                    child.student_no}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p
-                  className={cn(
-                    "font-mono text-base font-semibold tabular-nums",
-                    owes ? "text-slate-900" : "text-emerald-600",
-                  )}
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
+        {children.map((child) => {
+          const owes = Number(child.outstanding_balance) > 0;
+          return (
+            <article key={child.student_id} className={cn(portalCard, "overflow-hidden")}>
+              <div className="flex items-center gap-3 p-4">
+                <div
+                  aria-hidden
+                  className="grid size-12 shrink-0 place-items-center rounded-2xl bg-blue-50 text-sm font-semibold text-blue-700"
                 >
-                  {peso(child.outstanding_balance)}
-                </p>
-                <p
-                  className={cn(
-                    "text-[0.7rem] font-medium",
-                    owes ? "text-amber-600" : "text-emerald-600",
-                  )}
-                >
-                  {owes ? copy.outstanding : copy.settled}
-                </p>
-              </div>
-            </div>
-
-            {/* A child who has left stays visible — hiding them generates a
-                support call — but online payment is blocked, because
-                pta.payments carries an FK to student_enrollments and the
-                claim could never be approved. */}
-            {!child.is_enrolled && (
-              <div className="mx-4 mb-3 flex gap-2 rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-200">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <div>
-                  <p className="font-medium">{copy.notEnrolled}</p>
-                  <p className="mt-0.5">{copy.notEnrolledHelp}</p>
+                  {initials(child.full_name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900">{child.full_name}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {[child.grade_level, child.section_name].filter(Boolean).join(" · ") ||
+                      child.student_no}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p
+                    className={cn(
+                      "font-mono text-base font-semibold tabular-nums",
+                      owes ? "text-slate-900" : "text-emerald-600",
+                    )}
+                  >
+                    {peso(child.outstanding_balance)}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-[0.7rem] font-medium",
+                      owes ? "text-amber-600" : "text-emerald-600",
+                    )}
+                  >
+                    {owes ? copy.outstanding : copy.settled}
+                  </p>
                 </div>
               </div>
-            )}
 
-            <Link
-              href={{
-                pathname: "/portal/attendance",
-                query: { student: child.student_id },
-              }}
-              className="flex h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-medium text-blue-700 transition-colors hover:bg-slate-50 active:bg-slate-100"
-            >
-              <ScanLine className="size-4" />
-              {copy.viewAttendance}
-              <ChevronRight className="ml-auto size-4 text-slate-400" />
-            </Link>
-          </article>
-        );
-      })}
+              {/* A child who has left stays visible — hiding them generates a
+                  support call — but online payment is blocked, because
+                  pta.payments carries an FK to student_enrollments and the
+                  claim could never be approved. */}
+              {!child.is_enrolled && (
+                <div className="mx-4 mb-3 flex gap-2 rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-200">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">{copy.notEnrolled}</p>
+                    <p className="mt-0.5">{copy.notEnrolledHelp}</p>
+                  </div>
+                </div>
+              )}
+
+              <Link
+                href={{
+                  pathname: "/portal/attendance",
+                  query: { student: child.student_id },
+                }}
+                className="flex h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-medium text-blue-700 transition-colors hover:bg-slate-50 active:bg-slate-100"
+              >
+                <ScanLine className="size-4" />
+                {copy.viewAttendance}
+                <ChevronRight className="ml-auto size-4 text-slate-400" />
+              </Link>
+            </article>
+          );
+        })}
+      </div>
     </PortalScreen>
   );
 }

@@ -49,7 +49,7 @@ export default async function PortalPayPage({
 
           <div className="mt-3 px-1">
             <p className="text-sm text-blue-100">{copy.amountDue}</p>
-            <p className="mt-0.5 font-mono text-[2.25rem] font-semibold leading-tight tracking-tight tabular-nums">
+            <p className="mt-0.5 font-mono text-[2.25rem] font-semibold leading-tight tracking-tight tabular-nums md:text-5xl">
               {peso(due)}
             </p>
           </div>

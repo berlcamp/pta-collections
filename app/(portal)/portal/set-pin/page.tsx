@@ -21,8 +21,8 @@ export default async function SetPinPage() {
 
   return (
     <div className="portal-gradient min-h-svh text-white">
-      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 pb-[max(env(safe-area-inset-bottom),2rem)] pt-[max(env(safe-area-inset-top),0.75rem)]">
-        <div className="portal-in mt-14 flex flex-col items-center text-center">
+      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col px-5 md:justify-center md:py-12 pb-[max(env(safe-area-inset-bottom),2rem)] pt-[max(env(safe-area-inset-top),0.75rem)]">
+        <div className="portal-in mt-14 md:mt-0 flex flex-col items-center text-center">
           <div className="grid size-20 place-items-center rounded-[1.75rem] bg-white shadow-xl shadow-blue-950/30">
             <ShieldCheck className="size-10 text-blue-700" strokeWidth={1.75} />
           </div>

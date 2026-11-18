@@ -55,14 +55,16 @@ export default async function PortalGivePage() {
         <EmptyState icon={HeartHandshake}>{copy.noPrograms}</EmptyState>
       )}
 
-      {programs.map((program) => (
-        <GiveForm
-          key={program.id}
-          program={program}
-          locale={session.locale}
-          gcashNumber={account?.gcash_number ?? null}
-        />
-      ))}
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
+        {programs.map((program) => (
+          <GiveForm
+            key={program.id}
+            program={program}
+            locale={session.locale}
+            gcashNumber={account?.gcash_number ?? null}
+          />
+        ))}
+      </div>
 
       {pledges.length > 0 && (
         <>

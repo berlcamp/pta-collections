@@ -372,6 +372,23 @@
   background: var(--portal-sheet);
 }
 
+/* On a laptop the WHOLE page is the blue, fixed so it does not scroll away,
+   and the hero drops its own copy of the gradient to sit straight on it. The
+   compound selector out-ranks .portal-gradient, which stays the phone look. */
+@media (min-width: 768px) {
+  .portal-page {
+    background:
+      radial-gradient(70% 60% at 100% 0%, color-mix(in oklab, var(--portal-blue-400) 45%, transparent) 0%, transparent 60%),
+      radial-gradient(60% 60% at 0% 100%, color-mix(in oklab, var(--portal-blue-950) 70%, transparent) 0%, transparent 70%),
+      linear-gradient(160deg, var(--portal-blue-950) 0%, var(--portal-blue-800) 50%, var(--portal-blue-600) 100%);
+    background-attachment: fixed;
+  }
+
+  .portal-page .portal-hero {
+    background: none;
+  }
+}
+
 .portal-cta {
   background: linear-gradient(135deg, var(--portal-blue-800) 0%, var(--portal-blue-600) 100%);
 }

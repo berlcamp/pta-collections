@@ -13,9 +13,10 @@ import { cn } from "@/lib/utils";
  * history.back(): a parent who arrived from a Telegram message has no history
  * to go back to, and the arrow must still go somewhere sensible).
  *
- * On a phone this is the whole viewport. On a laptop it is a phone-width
- * column in the middle of the screen, which is what a banking app's web
- * version does too — stretching these cards to 1200px helps nobody.
+ * On a phone this is the whole viewport. On a laptop the entire page is the
+ * blue gradient, the hero sits straight on it, and the sheet becomes a wide
+ * rounded panel — the same app, given room. Pages lay their cards out two-up
+ * from `md` where that reads better than one long column.
  */
 export function PortalScreen({
   hero,
@@ -25,12 +26,12 @@ export function PortalScreen({
   children: React.ReactNode;
 }) {
   return (
-    <div className="md:py-8">
-      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col md:min-h-[calc(100svh-4rem)] md:overflow-hidden md:rounded-[2.25rem] md:shadow-2xl md:shadow-blue-950/25">
-        <header className="portal-gradient px-5 pb-12 pt-[max(env(safe-area-inset-top),0.75rem)] text-white">
+    <div className="portal-page min-h-svh">
+      <div className="mx-auto flex min-h-svh w-full max-w-md flex-col md:min-h-0 md:max-w-5xl md:px-8 md:pb-12 md:pt-6">
+        <header className="portal-gradient portal-hero px-5 pb-12 pt-[max(env(safe-area-inset-top),0.75rem)] text-white md:px-2 md:pb-8">
           {hero}
         </header>
-        <main className="portal-sheet relative -mt-7 flex-1 rounded-t-[1.75rem] px-4 pb-[max(env(safe-area-inset-bottom),2.5rem)] pt-5">
+        <main className="portal-sheet relative -mt-7 flex-1 rounded-t-[1.75rem] px-4 pb-[max(env(safe-area-inset-bottom),2.5rem)] pt-5 md:mt-0 md:flex-none md:rounded-[2rem] md:p-8 md:shadow-2xl md:shadow-blue-950/30">
           <div className="portal-in space-y-4">{children}</div>
         </main>
       </div>
