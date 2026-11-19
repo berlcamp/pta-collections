@@ -234,8 +234,9 @@ export async function createStudent(
  *
  * The guardian is edited IN PLACE rather than replaced. A guardian record is
  * shared by siblings by design (D8), so a correction here reaches every child
- * on file under that parent; the dialog says so. Repointing a student at a
- * different parent is a different act and is not offered here.
+ * on file under that parent; the dialog says so. LINKING a different parent
+ * already on file (guardian.relink) is the other act: it re-points this
+ * student and edits nobody's details.
  */
 export async function updateStudent(
   input: unknown,
@@ -318,7 +319,52 @@ export async function updateStudent(
   const contact = normalizeContact(g.contact_number ?? null);
   const named = Boolean(g.first_name && g.last_name);
 
-  if (g.guardian_id) {
+  if (g.guardian_id && g.relink) {
+    // Re-point this student at a parent already on file — the sibling's
+    // parent, typically. The linked record's own details are not touched.
+    const { data: target } = await supabase
+      .from("parents_guardians")
+      .select("id")
+      .eq("id", g.guardian_id)
+      .eq("school_id", ctx.activeSchool.id)
+      .is("merged_into", null)
+      .maybeSingle<{ id: string }>();
+    if (!target) {
+      return { ok: false, error: "That parent is no longer on file in this school." };
+    }
+
+    // The old primary link goes first: one primary per student is a unique
+    // index. Other (non-primary) guardians are left alone.
+    const { error: dropError } = await supabase
+      .from("student_guardians")
+      .delete()
+      .eq("student_id", v.student_id)
+      .eq("school_id", ctx.activeSchool.id)
+      .eq("is_primary", true)
+      .neq("guardian_id", target.id);
+    if (dropError) return { ok: false, error: dropError.message };
+
+    const { data: already } = await supabase
+      .from("student_guardians")
+      .select("id")
+      .eq("student_id", v.student_id)
+      .eq("guardian_id", target.id)
+      .maybeSingle<{ id: string }>();
+
+    const { error: linkError } = already
+      ? await supabase
+          .from("student_guardians")
+          .update({ is_primary: true, relationship: g.relationship })
+          .eq("id", already.id)
+      : await supabase.from("student_guardians").insert({
+          school_id: ctx.activeSchool.id,
+          student_id: v.student_id,
+          guardian_id: target.id,
+          relationship: g.relationship,
+          is_primary: true,
+        });
+    if (linkError) return { ok: false, error: linkError.message };
+  } else if (g.guardian_id) {
     const { error: guardianError } = await supabase
       .from("parents_guardians")
       .update({

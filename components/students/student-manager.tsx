@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Pencil, Users } from "lucide-react";
+import { Link2, Loader2, Pencil, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -40,9 +40,18 @@ import {
   type StudentRow,
 } from "@/components/tables/students-table";
 import { updateStudent } from "@/app/actions/students";
-import { editStudentSchema, type EditStudentInput } from "@/lib/validations/students";
+import { GuardianPicker } from "@/components/students/guardian-picker";
+import type { GuardianSearchResult } from "@/lib/data/guardians";
+import {
+  editStudentSchema,
+  type EditStudentInput,
+} from "@/lib/validations/students";
 import { RELATIONSHIPS } from "@/lib/import/parse";
-import type { GradeLevel, Section, StudentStatus } from "@/types/database.types";
+import type {
+  GradeLevel,
+  Section,
+  StudentStatus,
+} from "@/types/database.types";
 
 const NONE = "__none__";
 
@@ -157,9 +166,39 @@ function EditStudentDialog({
   // an effect so the dialog never paints the previous student's details first.
   const [seeded, setSeeded] = useState<string | null>(null);
   const seed = row?.student_id ?? null;
+  // A parent picked from "Link existing parent", replacing the one on file.
+  const [relinked, setRelinked] = useState<GuardianSearchResult | null>(null);
   if (seed !== seeded) {
     setSeeded(seed);
+    setRelinked(null);
     if (row) form.reset(defaultsFor(row, schoolYearId));
+  }
+
+  function linkExisting(g: GuardianSearchResult) {
+    if (g.id === row?.guardian?.guardian_id) {
+      setRelinked(null);
+      form.setValue("guardian.relink", false);
+      return;
+    }
+    setRelinked(g);
+    form.setValue("guardian.guardian_id", g.id);
+    form.setValue("guardian.relink", true);
+    form.setValue("guardian.first_name", g.first_name);
+    form.setValue("guardian.last_name", g.last_name);
+    form.setValue("guardian.contact_number", g.contact_number ?? "");
+    form.setValue("guardian.email", g.email ?? "");
+    form.clearErrors("guardian");
+  }
+
+  function undoLink() {
+    setRelinked(null);
+    if (row) {
+      const d = defaultsFor(row, schoolYearId).guardian;
+      form.setValue("guardian", {
+        ...d,
+        relationship: form.getValues("guardian.relationship"),
+      });
+    }
   }
 
   const gradeLevel = form.watch("grade_level");
@@ -474,11 +513,50 @@ function EditStudentDialog({
               </section>
 
               <section className="space-y-4">
-                <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  Parent / Guardian
-                </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                    Parent / Guardian
+                  </h3>
+                  {/* For a sibling whose parent was typed in again instead of
+                      linked: point this student at the record already on file. */}
+                  <GuardianPicker onSelect={linkExisting} disabled={pending} />
+                </div>
 
-                {siblings > 0 && (
+                {relinked && (
+                  <div className="flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                    <div className="min-w-0 space-y-0.5 text-sm">
+                      <p className="flex items-center gap-2 font-medium">
+                        <Link2 className="size-4 text-primary" />
+                        Linking {relinked.first_name} {relinked.last_name}
+                      </p>
+                      {relinked.contact_number && (
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {relinked.contact_number}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {relinked.children.length > 0
+                          ? `Already the parent of ${relinked.children.join(", ")}. `
+                          : ""}
+                        {row?.guardian
+                          ? `Replaces ${row.guardian.first_name} ${row.guardian.last_name} as this student's parent when you save.`
+                          : "Becomes this student's parent when you save."}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={undoLink}
+                      disabled={pending}
+                    >
+                      <X className="size-3.5" />
+                      Undo
+                    </Button>
+                  </div>
+                )}
+
+                {!relinked && siblings > 0 && (
                   <p className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
                     <Users className="mt-0.5 size-3.5 shrink-0" />
                     <span>
@@ -490,64 +568,68 @@ function EditStudentDialog({
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="guardian.first_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First name</FormLabel>
-                        <FormControl>
-                          <Input autoComplete="off" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="guardian.last_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last name</FormLabel>
-                        <FormControl>
-                          <Input autoComplete="off" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="guardian.contact_number"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contact number</FormLabel>
-                        <FormControl>
-                          <Input
-                            inputMode="tel"
-                            placeholder="09171234567"
-                            className="font-mono"
-                            {...field}
-                            value={field.value ?? ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="guardian.email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value ?? ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!relinked && (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="guardian.first_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>First name</FormLabel>
+                            <FormControl>
+                              <Input autoComplete="off" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="guardian.last_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Last name</FormLabel>
+                            <FormControl>
+                              <Input autoComplete="off" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="guardian.contact_number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact number</FormLabel>
+                            <FormControl>
+                              <Input
+                                inputMode="tel"
+                                placeholder="09171234567"
+                                className="font-mono"
+                                {...field}
+                                value={field.value ?? ""}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="guardian.email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  )}
                   <FormField
                     control={form.control}
                     name="guardian.relationship"
@@ -630,11 +712,14 @@ function defaultsFor(
     student_number: row?.student_number ?? "",
     guardian: {
       guardian_id: g?.guardian_id ?? null,
+      relink: false,
       first_name: g?.first_name ?? "",
       last_name: g?.last_name ?? "",
       contact_number: g?.contact_number ?? "",
       email: g?.email ?? "",
-      relationship: (g?.relationship as EditStudentInput["guardian"]["relationship"]) ?? "Mother",
+      relationship:
+        (g?.relationship as EditStudentInput["guardian"]["relationship"]) ??
+        "Mother",
     },
   };
 }

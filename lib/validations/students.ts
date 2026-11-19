@@ -117,6 +117,12 @@ const editGuardianSchema = z
   .object({
     /** The guardian already on file, when there is one. */
     guardian_id: dbId().nullish(),
+    /**
+     * Set when the dialog LINKED a different parent already on file. The
+     * student is then re-pointed at that record and its details are left as
+     * they are; without it, guardian_id means "correct this parent's details".
+     */
+    relink: z.boolean().optional(),
     first_name: z.string().trim(),
     last_name: z.string().trim(),
     contact_number: z.string().trim().max(40).optional(),
