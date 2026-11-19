@@ -276,7 +276,6 @@ export async function saveSchoolSettings(input: unknown): Promise<ActionResult> 
   // through with the rest.
   const {
     gcash_number,
-    telegram_bot_username,
     portal_require_pin,
     gate_notify_enabled,
     ...schoolColumns
@@ -302,7 +301,6 @@ export async function saveSchoolSettings(input: unknown): Promise<ActionResult> 
   // hand-written as an object in the SQL editor still resolves.
   const settings = [
     { key: "gcash_number", value: gcash_number },
-    { key: "telegram_bot", value: telegram_bot_username },
     // Stored only when TRUE. pta.portal_pin_required() defaults to false, so an
     // absent row and a stored `false` mean the same thing — and one of them is
     // a row nobody has to reason about later.

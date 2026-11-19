@@ -38,13 +38,11 @@ type SettingsValues = z.infer<typeof schoolSettingsSchema>;
 export function SchoolSettingsForm({
   school,
   gcashNumber,
-  telegramBotUsername,
   requirePin,
   gateNotifyEnabled,
 }: {
   school: School;
   gcashNumber: string;
-  telegramBotUsername: string;
   requirePin: boolean;
   gateNotifyEnabled: boolean;
 }) {
@@ -67,7 +65,6 @@ export function SchoolSettingsForm({
       receipt_footer_text: school.receipt_footer_text ?? "",
       timezone: school.timezone,
       gcash_number: gcashNumber,
-      telegram_bot_username: telegramBotUsername,
       portal_require_pin: requirePin,
       gate_notify_enabled: gateNotifyEnabled,
     },
@@ -407,30 +404,6 @@ export function SchoolSettingsForm({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="telegram_bot_username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telegram bot username</FormLabel>
-                  <FormControl>
-                    <Input
-                      className="w-72 font-mono"
-                      placeholder="MyschoolGateBot"
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    The bot @BotFather gave you, without the @. It builds the
-                    one-tap link on the portal&apos;s notification page. Until
-                    it is set, that page tells parents the school has not
-                    finished setting up its bot yet.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </CardContent>
         </Card>
 

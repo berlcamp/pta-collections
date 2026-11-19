@@ -41,6 +41,7 @@ export async function getSchoolSetupChecks(
     notifyRes,
     settingsRes,
     cardsRes,
+    botRes,
   ] = await Promise.all([
     count("school_years", { is_active: "true" }),
     count("sections"),
@@ -56,12 +57,14 @@ export async function getSchoolSetupChecks(
       .from("school_settings")
       .select("key, value")
       .eq("school_id", schoolId)
-      .in("key", ["telegram_bot", "gcash_number"]),
+      .in("key", ["gcash_number"]),
     // The VIEW, not pta.portal_accounts. That table has no read policy at all
     // (0016) -- RLS is row-level, and any policy letting staff see the row lets
     // them see card_number and pin_hash inside it. Counting the table would
     // always return 0 and report "no parent cards" for a school that has them.
     count("v_parent_cards_detail", { status: "active" }),
+    // The global bot, or the school's old row while none is set (0033).
+    supabase.rpc("telegram_bot_username", { p_school_id: schoolId }),
   ]);
 
   const settingSet = (key: string) => {
@@ -120,12 +123,13 @@ export async function getSchoolSetupChecks(
     },
     {
       label: "Telegram bot username",
-      done: settingSet("telegram_bot"),
-      detail:
-        "Without it the portal's notification page tells parents the school has not finished setting up its bot, and the connect button has no link to open.",
+      done: Boolean(botRes.data),
+      detail: isSuperAdmin
+        ? "One bot serves every school (0033). Without it the portal's notification page tells parents the school has not finished setting up its bot, and the connect button has no link to open."
+        : "Set once for every school by the system administrator. Until then the portal's notification page has no Connect Telegram link.",
       silent: true,
-      href: "/admin/settings",
-      hrefLabel: "Settings",
+      href: isSuperAdmin ? "/super/settings" : undefined,
+      hrefLabel: "Global settings",
     },
     {
       label: "PTA GCash number",

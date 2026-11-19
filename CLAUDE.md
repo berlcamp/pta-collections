@@ -204,11 +204,13 @@ one taken at the counter — same receipt series, same daily report.
   It signs for **every** role including `service_role`, across all three apps on
   this project — `lib/portal/jwt.ts` is the only file allowed to touch it, and
   the role there is a hardcoded constant.
-- The GCash number, the Telegram bot username and the **Require a PIN** switch
-  are set in the app, at **Administration → Settings → Parent Portal**
-  (admin only). They are stored as
-  `school_settings` rows keyed `gcash_number`, `telegram_bot` and
-  `portal_require_pin`. `0018` re-asserts the two Telegram readers after `0016`
+- The GCash number and the **Require a PIN** switch are set per school at
+  **Administration → Settings → Parent Portal** (admin only), stored as
+  `school_settings` rows keyed `gcash_number` and `portal_require_pin`. The
+  **Telegram bot username is global**: set once at **Super admin → Settings**,
+  stored in `pta.app_settings` (`0033`), and read ONLY through
+  `pta.telegram_bot_username(school)`, which falls back to a school's old
+  `school_settings.telegram_bot` row while no global handle is set. `0018` re-asserts the two Telegram readers after `0016`
   was wrongly corrected in place: an applied migration is history, and a fix to
   one belongs in a new file. Both readers
   accept either a bare JSON string or `{"number": ...}` / `{"username": ...}`,
@@ -227,8 +229,8 @@ silently, and look identical to a broken deployment:
 - **An active `school_year`** — without it `gate_roster` is empty, the portal
   shows no children, and no payment can be recorded (`pta.payments` has an FK
   to `student_enrollments`).
-- **`school_settings.telegram_bot` / `gcash_number`** — the portal omits the
-  step rather than announcing the gap.
+- **The global Telegram bot / `school_settings.gcash_number`** — the portal
+  omits the step rather than announcing the gap.
 
 Per school, hardware included: a `gate_devices` row mapping a device id to the
 school (the tenancy key — `record_attendance()` refuses an unregistered device),
@@ -238,10 +240,9 @@ One-time and never repeated: the migrations, `esp32/sql/webhook.sql` (the
 trigger is on the `pta.attendance` TABLE, so it covers every school), both Edge
 Functions, Telegram's `setWebhook`, and `SUPABASE_JWT_SECRET`.
 
-**There is one `TELEGRAM_BOT_TOKEN` for the whole deployment.** The per-school
-`telegram_bot` setting only builds the deep link; sending uses that single
-token, so every school shares one bot until `notify-guardian` learns to look a
-token up per school.
+**There is one `TELEGRAM_BOT_TOKEN` for the whole deployment**, so there is one
+bot, and its handle is one global setting (`0033`). The handle only builds the
+deep link; sending uses the token.
 
 ### A parent card follows the child, and is not clicked
 `0022_parent_cards_automatic.sql`. Linking a guardian to a student MINTS their

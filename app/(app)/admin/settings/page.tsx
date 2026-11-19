@@ -18,7 +18,7 @@ export default async function SettingsPage() {
       .from("school_settings")
       .select("key, value")
       .eq("school_id", ctx.activeSchool.id)
-      .in("key", ["gcash_number", "telegram_bot", "portal_require_pin"]),
+      .in("key", ["gcash_number", "portal_require_pin"]),
     supabase
       .from("gate_notify_config")
       .select("enabled")
@@ -64,7 +64,6 @@ export default async function SettingsPage() {
       <SchoolSettingsForm
         school={ctx.activeSchool}
         gcashNumber={read("gcash_number")}
-        telegramBotUsername={read("telegram_bot")}
         requirePin={requirePin}
         // No row means OFF -- claim_notifications() returns early on `not
         // found`, so an unconfigured school silently sends nothing.

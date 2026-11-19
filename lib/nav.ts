@@ -179,6 +179,8 @@ export const SUPER_NAV: NavGroup[] = [
         children: [
           { label: "Overview", href: "/super", icon: "LayoutDashboard" },
           { label: "Schools", href: "/super/schools", icon: "Building2" },
+          // Deployment-wide, not per school: the one Telegram bot (0033).
+          { label: "Settings", href: "/super/settings", icon: "Settings" },
         ],
       },
       {

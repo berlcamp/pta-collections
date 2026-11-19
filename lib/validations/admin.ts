@@ -89,20 +89,6 @@ export const schoolSettingsSchema = z.object({
   // and a Telegram bot), and school_settings is where per-school configuration
   // that is not printed on a receipt belongs.
   gcash_number: z.string().trim().max(40).optional().nullable(),
-  telegram_bot_username: z
-    .string()
-    .trim()
-    .max(64)
-    // BotFather's own rule. Accepting a leading @ and stripping it saves the
-    // support call: everybody copies the handle with the @ attached, and the
-    // deep link https://t.me/@Bot is a 404.
-    .transform((v) => (v ?? "").replace(/^@/, ""))
-    .refine(
-      (v) => v === "" || /^[A-Za-z0-9_]{5,32}$/.test(v),
-      "A bot username is 5–32 letters, digits or underscores.",
-    )
-    .optional()
-    .nullable(),
   // 0017. Off means the 16-digit barcode alone signs a parent in — a
   // single-factor bearer credential that cashiers read at the POS all day.
   portal_require_pin: z.boolean(),
@@ -112,4 +98,19 @@ export const schoolSettingsSchema = z.object({
   // indistinguishable from a broken trigger. This checkbox is what stops that
   // being a SQL step somebody forgets.
   gate_notify_enabled: z.boolean(),
+});
+
+/** Deployment-wide settings, super admin only (0033). */
+export const globalSettingsSchema = z.object({
+  telegram_bot_username: z
+    .string()
+    .trim()
+    .max(64)
+    // BotFather's own rule. A leading @ is stripped: everybody copies the
+    // handle with it, and https://t.me/@Bot is a 404.
+    .transform((v) => v.replace(/^@/, ""))
+    .refine(
+      (v) => v === "" || /^[A-Za-z0-9_]{5,32}$/.test(v),
+      "A bot username is 5–32 letters, digits or underscores.",
+    ),
 });
