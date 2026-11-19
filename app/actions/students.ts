@@ -81,6 +81,77 @@ export async function createStudent(
 
   const supabase = await createClient();
 
+  // Every student has a parent on file — required on this form, so the
+  // family can be reached, sees the child in the portal, and is one family for
+  // per-family fees. Resolved BEFORE the student is written, so a parent that
+  // cannot be found or saved means no half-registered student.
+  //
+  // Either a record that already exists in this school — the sibling case,
+  // linked by id — or one typed in full and created here.
+  const g = v.guardian;
+  const contact = normalizeContact(g.contact_number ?? null);
+  const named = Boolean(g.first_name && g.last_name);
+  let guardianId: string | undefined;
+
+  if (g.guardian_id) {
+    // The id came from the browser, so it is confirmed to live in this school
+    // before anything is linked to it.
+    const { data: linked } = await supabase
+      .from("parents_guardians")
+      .select("id")
+      .eq("school_id", ctx.activeSchool.id)
+      .eq("id", g.guardian_id)
+      .maybeSingle();
+    guardianId = (linked as { id: string } | null)?.id;
+  } else if (named) {
+    // Reuse an exact match on name AND contact — the same parent typed out
+    // twice for two siblings instead of picked from the search. A name alone
+    // is not enough: two different Maria Santos are two different people.
+    let match = supabase
+      .from("parents_guardians")
+      .select("id")
+      .eq("school_id", ctx.activeSchool.id)
+      .ilike("first_name", g.first_name)
+      .ilike("last_name", g.last_name)
+      // A merged duplicate (0027) is history, never a match.
+      .is("merged_into", null);
+    match = contact
+      ? match.eq("contact_number", contact)
+      : match.is("contact_number", null);
+
+    const { data: existing } = await match.limit(1).maybeSingle();
+    guardianId = (existing as { id: string } | null)?.id;
+
+    if (!guardianId) {
+      const { data: created, error: createError } = await supabase
+        .from("parents_guardians")
+        .insert({
+          school_id: ctx.activeSchool.id,
+          first_name: g.first_name,
+          last_name: g.last_name,
+          contact_number: contact,
+          email: g.email || null,
+          created_by: ctx.profile.id,
+        })
+        .select("id")
+        .single();
+      guardianId = (created as { id: string } | null)?.id;
+      if (createError) {
+        return { ok: false, error: `Could not save the parent: ${createError.message}` };
+      }
+    }
+  }
+
+  if (!guardianId) {
+    return {
+      ok: false,
+      error: g.guardian_id
+        ? "That parent is no longer on file in this school. Search for them again."
+        : "Add the student's parent or guardian.",
+    };
+  }
+
+
   const { data: student, error: studentError } = await supabase
     .from("students")
     .insert({
@@ -132,68 +203,19 @@ export async function createStudent(
     };
   }
 
-  // Exactly one guardian per student. Either it is a record that already
-  // exists in this school — the sibling case, linked by id — or it is typed in
-  // full and created here.
-  const g = v.guardian;
-  const contact = normalizeContact(g.contact_number ?? null);
-  const named = Boolean(g.first_name && g.last_name);
-  let guardianId: string | undefined;
-
-  if (g.guardian_id) {
-    // The id came from the browser, so it is confirmed to live in this school
-    // before anything is linked to it.
-    const { data: linked } = await supabase
-      .from("parents_guardians")
-      .select("id")
-      .eq("school_id", ctx.activeSchool.id)
-      .eq("id", g.guardian_id)
-      .maybeSingle();
-    guardianId = (linked as { id: string } | null)?.id;
-  } else if (named) {
-    // Reuse an exact match on name AND contact — the same parent typed out
-    // twice for two siblings instead of picked from the search. A name alone
-    // is not enough: two different Maria Santos are two different people.
-    let match = supabase
-      .from("parents_guardians")
-      .select("id")
-      .eq("school_id", ctx.activeSchool.id)
-      .ilike("first_name", g.first_name)
-      .ilike("last_name", g.last_name)
-      // A merged duplicate (0027) is history, never a match.
-      .is("merged_into", null);
-    match = contact
-      ? match.eq("contact_number", contact)
-      : match.is("contact_number", null);
-
-    const { data: existing } = await match.limit(1).maybeSingle();
-    guardianId = (existing as { id: string } | null)?.id;
-
-    if (!guardianId) {
-      const { data: created } = await supabase
-        .from("parents_guardians")
-        .insert({
-          school_id: ctx.activeSchool.id,
-          first_name: g.first_name,
-          last_name: g.last_name,
-          contact_number: contact,
-          email: g.email || null,
-          created_by: ctx.profile.id,
-        })
-        .select("id")
-        .single();
-      guardianId = (created as { id: string } | null)?.id;
-    }
-  }
-
-  if (guardianId) {
-    await supabase.from("student_guardians").insert({
-      school_id: ctx.activeSchool.id,
-      student_id: student.id,
-      guardian_id: guardianId,
-      relationship: g.relationship,
-      is_primary: true,
-    });
+  const { error: linkError } = await supabase.from("student_guardians").insert({
+    school_id: ctx.activeSchool.id,
+    student_id: student.id,
+    guardian_id: guardianId,
+    relationship: g.relationship,
+    is_primary: true,
+  });
+  if (linkError) {
+    // Same hand rollback as the enrollment: the parent is required, so a
+    // student without one is not saved. Deleting the student cascades to the
+    // enrollment written above.
+    await supabase.from("students").delete().eq("id", student.id);
+    return { ok: false, error: `Could not link the parent: ${linkError.message}` };
   }
 
   revalidatePath("/students");

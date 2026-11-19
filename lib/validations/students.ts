@@ -55,6 +55,29 @@ const guardianSchema = z
     }
   });
 
+/**
+ * On registration the parent is REQUIRED: linked by id, or named in full.
+ * (Editing keeps the softer rule above, so an older student with no parent on
+ * file can still be corrected without inventing one.)
+ */
+const requiredGuardianSchema = guardianSchema.superRefine((g, ctx) => {
+  if (g.guardian_id) return;
+  if (!g.first_name) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["first_name"],
+      message: "The parent's first name is required.",
+    });
+  }
+  if (!g.last_name) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["last_name"],
+      message: "The parent's last name is required.",
+    });
+  }
+});
+
 export const newStudentSchema = z.object({
   schoolYearId: dbId(),
   lrn: z
@@ -72,7 +95,7 @@ export const newStudentSchema = z.object({
   grade_level: z.string().min(1, "Choose a grade level."),
   section_id: dbId().optional().nullable(),
   student_number: z.string().trim().max(40).optional(),
-  guardian: guardianSchema,
+  guardian: requiredGuardianSchema,
 });
 
 export type NewStudentInput = z.infer<typeof newStudentSchema>;

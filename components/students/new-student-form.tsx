@@ -146,8 +146,7 @@ export function NewStudentForm({
 
   function onSubmit(values: NewStudentInput) {
     startTransition(async () => {
-      // A guardian left entirely blank is not an error — it is a student
-      // enrolled before the office has the parent's details. The action drops it.
+      // The parent is required: linked, or named in full (newStudentSchema).
       const res = await createStudent({
         ...values,
         birth_date: values.birth_date || undefined,
@@ -424,7 +423,9 @@ export function NewStudentForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Parent / Guardian</CardTitle>
+            <CardTitle>
+              Parent / Guardian <RequiredMark />
+            </CardTitle>
             <CardDescription>
               One guardian per student — the contact for collection notices.
               Siblings share one parent record: that is how the school knows
@@ -546,7 +547,9 @@ export function NewStudentForm({
                   name="guardian.first_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First name</FormLabel>
+                      <FormLabel>
+                        First name <RequiredMark />
+                      </FormLabel>
                       <FormControl>
                         <Input autoComplete="off" {...field} />
                       </FormControl>
@@ -560,7 +563,9 @@ export function NewStudentForm({
                   name="guardian.last_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Last name</FormLabel>
+                      <FormLabel>
+                        Last name <RequiredMark />
+                      </FormLabel>
                       <FormControl>
                         <Input autoComplete="off" {...field} />
                       </FormControl>
