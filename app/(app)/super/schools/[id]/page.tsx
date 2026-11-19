@@ -37,7 +37,7 @@ export default async function SchoolDetailPage({
   const [membersRes, invitesRes, checks] = await Promise.all([
     supabase
       .from("school_users")
-      .select("id, role, status, created_at, profile:profiles(full_name, email)")
+      .select("id, role, status, created_at, profile:profiles!school_users_profile_id_fkey(full_name, email)")
       .eq("school_id", id)
       .order("role"),
     supabase

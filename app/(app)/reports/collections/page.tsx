@@ -41,7 +41,7 @@ export default async function CollectionReportPage({
   const supabase = await createClient();
   const { data: memberRows } = await supabase
     .from("school_users")
-    .select("profile:profiles(id, full_name)")
+    .select("profile:profiles!school_users_profile_id_fkey(id, full_name)")
     .eq("school_id", ctx.activeSchool.id)
     .eq("status", "active");
 

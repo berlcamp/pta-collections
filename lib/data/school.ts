@@ -101,7 +101,7 @@ export async function getSchoolTeachers(schoolId: string): Promise<SchoolTeacher
   const supabase = await createClient();
   const { data } = await supabase
     .from("school_users")
-    .select("profile_id, profile:profiles(full_name, email)")
+    .select("profile_id, profile:profiles!school_users_profile_id_fkey(full_name, email)")
     .eq("school_id", schoolId)
     .eq("role", "teacher")
     .eq("status", "active");

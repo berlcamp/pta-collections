@@ -102,7 +102,7 @@ export default async function TodayCollectionsPage({
     paymentsQuery,
     supabase
       .from("school_users")
-      .select("profile_id, profile:profiles(id, full_name)")
+      .select("profile_id, profile:profiles!school_users_profile_id_fkey(id, full_name)")
       .eq("school_id", ctx.activeSchool.id)
       .eq("status", "active"),
     donationsQuery,

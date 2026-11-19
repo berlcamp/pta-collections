@@ -28,7 +28,7 @@ export default async function UsersPage() {
   const [membersRes, invitesRes, signInsRes] = await Promise.all([
     supabase
       .from("school_users")
-      .select("id, role, status, created_at, profile:profiles(id, full_name, email)")
+      .select("id, role, status, created_at, profile:profiles!school_users_profile_id_fkey(id, full_name, email)")
       .eq("school_id", ctx.activeSchool.id)
       .order("role"),
     supabase

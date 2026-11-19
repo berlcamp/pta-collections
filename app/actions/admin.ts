@@ -186,7 +186,7 @@ export async function inviteUser(input: unknown): Promise<InviteOutcome> {
 
   const { data: existing } = await supabase
     .from("school_users")
-    .select("role, status, profile:profiles!inner(full_name, email)")
+    .select("role, status, profile:profiles!school_users_profile_id_fkey!inner(full_name, email)")
     .eq("school_id", ctx.activeSchool.id)
     .eq("profile.email", parsed.data.email.trim().toLowerCase())
     .maybeSingle();
