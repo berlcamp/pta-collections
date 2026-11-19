@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import QRCode from "qrcode";
 import { IdCard, Loader2, Printer, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -246,6 +247,7 @@ export function ParentCardManager({
 
               {slip.cardNumber && (
                 <>
+                  <PortalQr cardNumber={slip.cardNumber} />
                   <div
                     className="mx-auto text-foreground"
                     // Hand-rolled Code 128-C from lib/barcode.ts — no dependency,
@@ -386,5 +388,56 @@ export function ParentCardManager({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * A QR code a parent scans with their phone camera to open the Parent Portal
+ * already signed in — or, where the school requires a PIN, on the PIN step
+ * with the card filled in. The barcode below it stays: that one is for the
+ * cashier's USB scanner, which reads Code 128, and a phone camera reading the
+ * barcode gets digits, not a link.
+ *
+ * The card number travels in the URL fragment (#c=…), which browsers never
+ * send to a server — see PortalLoginForm. It is the same number printed
+ * beneath, so the QR is no more of a credential than the slip already is.
+ * Drawn in the browser: the number only ever exists here, never in a page the
+ * server rendered.
+ */
+function PortalQr({ cardNumber }: { cardNumber: string }) {
+  const [svg, setSvg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const url = `${window.location.origin}/portal/login#c=${cardNumber}`;
+    QRCode.toString(url, {
+      type: "svg",
+      errorCorrectionLevel: "M",
+      margin: 1,
+      color: { dark: "#0f172a", light: "#ffffff" },
+    })
+      .then((out) => {
+        if (live) setSvg(out);
+      })
+      .catch(() => {
+        if (live) setSvg(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [cardNumber]);
+
+  return (
+    <div className="space-y-1">
+      <div
+        className="mx-auto size-40 [&>svg]:size-full"
+        aria-label="QR code to open the Parent Portal"
+        role="img"
+        dangerouslySetInnerHTML={svg ? { __html: svg } : undefined}
+      />
+      <p className="text-xs text-muted-foreground">
+        Parents: scan with your phone camera to open the Parent Portal.
+      </p>
+    </div>
   );
 }

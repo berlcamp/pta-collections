@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { AlertCircle, ArrowRight, CreditCard, KeyRound, Loader2 } from "lucide-react";
 
 import { portalLogin } from "@/app/actions/portal-auth";
@@ -11,7 +11,11 @@ import {
   portalLabel,
 } from "@/components/portal/styles";
 import { cn } from "@/lib/utils";
-import { formatCardNumber, normalizeCardNumber } from "@/lib/portal/card";
+import {
+  formatCardNumber,
+  isValidCardNumber,
+  normalizeCardNumber,
+} from "@/lib/portal/card";
 import { t } from "@/lib/portal/i18n";
 import type { PortalLocale } from "@/types/database.types";
 
@@ -28,15 +32,16 @@ export function PortalLoginForm({ locale }: { locale: PortalLocale }) {
   // portal_login() asks for one -- which it only does for a card that exists.
   const [pinNeeded, setPinNeeded] = useState(false);
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setAttemptsLeft(null);
-
+  function login(cardNumber: string, pinValue: string) {
     startTransition(async () => {
+      setError(null);
+      setAttemptsLeft(null);
+      // Shown in the field whichever way it arrived, so a PIN prompt after a
+      // QR scan already has the card filled in.
+      setCard(cardNumber);
       const result = await portalLogin({
-        cardNumber: normalizeCardNumber(card),
-        pin: pinNeeded ? pin : "",
+        cardNumber,
+        pin: pinValue,
       });
 
       if (!result.ok) {
@@ -66,6 +71,33 @@ export function PortalLoginForm({ locale }: { locale: PortalLocale }) {
     });
   }
 
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    login(normalizeCardNumber(card), pinNeeded ? pin : "");
+  }
+
+  /**
+   * The QR code on a parent's slip opens /portal/login#c=<card>. The number
+   * rides in the URL FRAGMENT on purpose: a fragment is never sent to the
+   * server, so the card — a bearer credential — stays out of access logs and
+   * proxies. It is read here, wiped from the address bar at once, and
+   * submitted exactly as if the parent had typed it. A school that requires a
+   * PIN answers pin_required, and the PIN field appears with the card already
+   * filled in; otherwise the parent lands straight in the portal.
+   */
+  const fromQr = useRef(false);
+  useEffect(() => {
+    if (fromQr.current) return;
+    const match = /(?:^|[#&])c=([0-9 -]{16,24})/.exec(window.location.hash);
+    if (!match) return;
+    fromQr.current = true;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    const scanned = normalizeCardNumber(match[1]);
+    if (isValidCardNumber(scanned)) login(scanned, "");
+    // Runs once, on arrival from a scanned slip.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <form onSubmit={submit} className="space-y-5">
       <div>
