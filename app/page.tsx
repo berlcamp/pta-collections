@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Smartphone,
   Wallet,
+  Presentation,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -172,6 +173,7 @@ const ROLE_ICONS = {
   cashier: Banknote,
   treasurer: FileBarChart,
   viewer: Eye,
+  teacher: Presentation,
 } as const;
 
 const FACTS = [
@@ -580,7 +582,7 @@ export default function LandingPage() {
                 </h2>
                 <p className="mt-4 text-lg text-pretty text-muted-foreground">
                   Separation of duties is the whole point of a PTA&apos;s books.
-                  Four roles, assigned per school, enforced on the server on every
+                  Five roles, assigned per school, enforced on the server on every
                   single request — not merely hidden from the menu.
                 </p>
               </div>

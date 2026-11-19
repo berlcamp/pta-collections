@@ -7,7 +7,7 @@
  */
 
 export type GlobalRole = "super_admin" | "user";
-export type SchoolRole = "admin" | "cashier" | "treasurer" | "viewer";
+export type SchoolRole = "admin" | "cashier" | "treasurer" | "viewer" | "teacher";
 export type MembershipStatus = "active" | "inactive";
 export type InviteStatus = "pending" | "accepted" | "revoked" | "expired";
 export type FeeCategory = "annual" | "penalty" | "special" | "other" | "homeroom";

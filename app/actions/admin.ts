@@ -13,6 +13,8 @@ import {
   schoolYearSchema,
   sectionSchema,
 } from "@/lib/validations/admin";
+import { z } from "zod";
+import { dbId } from "@/lib/validations/id";
 import type { ActionResult } from "./types";
 
 export async function saveSchoolYear(input: unknown): Promise<ActionResult> {
@@ -97,6 +99,62 @@ export async function saveSection(input: unknown): Promise<ActionResult> {
         ? "That section already exists for this grade level and school year."
         : error.message,
     };
+  }
+
+  revalidatePath("/admin/sections");
+  return { ok: true, data: undefined };
+}
+
+const sectionTeachersSchema = z.object({
+  sectionId: dbId(),
+  profileIds: z.array(dbId()).max(20),
+});
+
+/**
+ * Who teaches a section (0030). Replaces the section's assignments with the
+ * list given. RLS on section_teachers is the real gate: admin only, and only
+ * profiles holding an active teacher membership in this school.
+ */
+export async function setSectionTeachers(input: unknown): Promise<ActionResult> {
+  const ctx = await requireSchool();
+  if (!can(ctx.activeRole, "manageSections")) {
+    return { ok: false, error: "Only an administrator can assign teachers." };
+  }
+  const parsed = sectionTeachersSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid request." };
+  const { sectionId, profileIds } = parsed.data;
+
+  const supabase = await createClient();
+  const { data: current, error: readError } = await supabase
+    .from("section_teachers")
+    .select("profile_id")
+    .eq("section_id", sectionId)
+    .eq("school_id", ctx.activeSchool.id);
+  if (readError) return { ok: false, error: readError.message };
+
+  const have = new Set((current ?? []).map((r: { profile_id: string }) => r.profile_id));
+  const want = new Set(profileIds);
+  const remove = [...have].filter((id) => !want.has(id));
+  const add = [...want].filter((id) => !have.has(id));
+
+  if (remove.length > 0) {
+    const { error } = await supabase
+      .from("section_teachers")
+      .delete()
+      .eq("section_id", sectionId)
+      .eq("school_id", ctx.activeSchool.id)
+      .in("profile_id", remove);
+    if (error) return { ok: false, error: error.message };
+  }
+  if (add.length > 0) {
+    const { error } = await supabase.from("section_teachers").insert(
+      add.map((profile_id) => ({
+        section_id: sectionId,
+        profile_id,
+        school_id: ctx.activeSchool.id,
+      })),
+    );
+    if (error) return { ok: false, error: error.message };
   }
 
   revalidatePath("/admin/sections");

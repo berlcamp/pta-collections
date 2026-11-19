@@ -37,7 +37,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/common/empty-state";
 import { sectionSchema } from "@/lib/validations/admin";
-import { saveSection } from "@/app/actions/admin";
+import { saveSection, setSectionTeachers } from "@/app/actions/admin";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { SchoolTeacher } from "@/lib/data/school";
 import type { GradeLevel, SchoolYear, Section } from "@/types/database.types";
 
 // The school year comes from the page's own picker, not from this form.
@@ -49,17 +51,25 @@ export function SectionManager({
   gradeLevels,
   schoolYears,
   currentYearId,
+  teachers,
+  assignments,
 }: {
   sections: Section[];
   gradeLevels: GradeLevel[];
   schoolYears: SchoolYear[];
   currentYearId: string;
+  /** Active teacher accounts (0030), and who is assigned to each section. */
+  teachers: SchoolTeacher[];
+  assignments: Record<string, string[]>;
 }) {
   const router = useRouter();
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
   // The section being renamed; null while creating a new one.
   const [editing, setEditing] = useState<Section | null>(null);
+  // Teacher profile ids ticked in the modal.
+  const [assigned, setAssigned] = useState<string[]>([]);
+  const teacherName = new Map(teachers.map((t) => [t.profile_id, t.full_name]));
   const [pending, startTransition] = useTransition();
 
   const form = useForm<SectionValues>({
@@ -87,12 +97,14 @@ export function SectionManager({
   function openNew() {
     setEditing(null);
     form.reset({ grade_level: gradeLevels[0]?.code ?? "Grade 7", name: "" });
+    setAssigned([]);
     setOpen(true);
   }
 
   function openEdit(section: Section) {
     setEditing(section);
     form.reset({ grade_level: section.grade_level, name: section.name });
+    setAssigned(assignments[section.id] ?? []);
     setOpen(true);
   }
 
@@ -111,6 +123,16 @@ export function SectionManager({
         // A duplicate section name within a grade is the database's call.
         form.setError("name", { message: res.error });
         return;
+      }
+      if (editing) {
+        const before = [...(assignments[editing.id] ?? [])].sort().join();
+        if ([...assigned].sort().join() !== before) {
+          const t = await setSectionTeachers({ sectionId: editing.id, profileIds: assigned });
+          if (!t.ok) {
+            toast.error(t.error);
+            return;
+          }
+        }
       }
       toast.success(editing ? "Section renamed." : "Section created.");
       setOpen(false);
@@ -168,6 +190,13 @@ export function SectionManager({
                         className="gap-1 transition-colors group-hover:bg-primary/10"
                       >
                         {s.name}
+                        {(assignments[s.id] ?? []).length > 0 && (
+                          <span className="font-normal text-muted-foreground">
+                            · {(assignments[s.id] ?? [])
+                              .map((id) => teacherName.get(id) ?? "Teacher")
+                              .join(", ")}
+                          </span>
+                        )}
                         <Pencil className="size-3 opacity-50 group-hover:opacity-100" />
                       </Badge>
                     </button>
@@ -255,6 +284,47 @@ export function SectionManager({
                   </FormItem>
                 )}
               />
+
+              {editing && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Teachers</p>
+                  {teachers.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No teacher accounts yet. Invite one under Administration →
+                      Users with the Teacher role, then assign them here.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
+                      {teachers.map((t) => (
+                        <label
+                          key={t.profile_id}
+                          className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/50"
+                        >
+                          <Checkbox
+                            checked={assigned.includes(t.profile_id)}
+                            onCheckedChange={(v) =>
+                              setAssigned((cur) =>
+                                v
+                                  ? [...cur, t.profile_id]
+                                  : cur.filter((x) => x !== t.profile_id),
+                              )
+                            }
+                          />
+                          <span className="min-w-0 flex-1 text-sm">
+                            {t.full_name}
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {t.email}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    A teacher sees gate attendance for their sections only.
+                  </p>
+                </div>
+              )}
 
               <DialogFooter>
                 <Button

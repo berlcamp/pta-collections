@@ -2,13 +2,20 @@ import { CalendarCheck, CalendarDays, IdCardLanyard, ScanLine, UserCheck } from 
 
 import { requireSchool } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
-import { getSchoolYears, resolveSchoolYear } from "@/lib/data/school";
+import {
+  getGradeLevels,
+  getSchoolYears,
+  getSections,
+  resolveSchoolYear,
+} from "@/lib/data/school";
 import {
   attendanceWindow,
   getAttendanceDays,
   getAttendanceStudents,
   rollUpByGrade,
+  scopeStudents,
 } from "@/lib/data/attendance";
+import { AttendanceScopeFilter } from "@/components/reports/attendance-scope-filter";
 import { formatDate, todayInTimezone } from "@/lib/utils/dates";
 import { PageHeader, SectionHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
@@ -76,10 +83,24 @@ export default async function AttendanceReportPage({
   const today = todayInTimezone(ctx.activeSchool.timezone);
   const { from, to } = attendanceWindow(schoolYear, sp.from, sp.to, today);
 
-  const [days, students] = await Promise.all([
-    getAttendanceDays(ctx.activeSchool.id, from, to),
+  const [gradeLevels, sections] = await Promise.all([
+    getGradeLevels(),
+    getSections(ctx.activeSchool.id, schoolYear.id),
+  ]);
+  // Only a section of THIS year counts; a stale ?section= from another year
+  // is dropped rather than filtering the report to nothing.
+  const section = sections.find((s) => s.id === sp.section) ?? null;
+  const gradeLevel = section?.grade_level ?? (gradeLevels.some((g) => g.code === sp.grade) ? sp.grade! : null);
+
+  const [days, allStudents] = await Promise.all([
+    getAttendanceDays(ctx.activeSchool.id, from, to, {
+      schoolYearId: schoolYear.id,
+      gradeLevel,
+      sectionId: section?.id ?? null,
+    }),
     getAttendanceStudents(ctx.activeSchool.id, schoolYear.id, from, to),
   ]);
+  const students = scopeStudents(allStudents, gradeLevel, section);
 
   // The number of days the gate saw anybody. It is the only school-day count
   // available: nothing in the database knows the school calendar, so a run of
@@ -133,6 +154,13 @@ export default async function AttendanceReportPage({
         schoolYears={schoolYears}
         currentYearId={schoolYear.id}
         show={{ dateRange: true }}
+      />
+
+      <AttendanceScopeFilter
+        grades={gradeLevels
+          .filter((g) => allStudents.some((s) => s.grade_level === g.code))
+          .map((g) => ({ code: g.code, label: g.label }))}
+        sections={sections.map((s) => ({ id: s.id, name: s.name, grade_level: s.grade_level }))}
       />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

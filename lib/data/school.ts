@@ -89,3 +89,49 @@ export async function getGradeLevels(): Promise<GradeLevel[]> {
     .order("sort_order");
   return (data ?? []) as GradeLevel[];
 }
+
+export interface SchoolTeacher {
+  profile_id: string;
+  full_name: string;
+  email: string;
+}
+
+/** Active teacher accounts in the school (0030), for assigning to sections. */
+export async function getSchoolTeachers(schoolId: string): Promise<SchoolTeacher[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("school_users")
+    .select("profile_id, profile:profiles(full_name, email)")
+    .eq("school_id", schoolId)
+    .eq("role", "teacher")
+    .eq("status", "active");
+  return ((data ?? []) as unknown as {
+    profile_id: string;
+    profile: { full_name: string; email: string } | null;
+  }[])
+    .map((r) => ({
+      profile_id: r.profile_id,
+      full_name: r.profile?.full_name ?? r.profile?.email ?? "Teacher",
+      email: r.profile?.email ?? "",
+    }))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
+}
+
+/** Teacher profile ids per section, for the given sections. */
+export async function getSectionTeacherIds(
+  schoolId: string,
+  sectionIds: string[],
+): Promise<Record<string, string[]>> {
+  if (sectionIds.length === 0) return {};
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("section_teachers")
+    .select("section_id, profile_id")
+    .eq("school_id", schoolId)
+    .in("section_id", sectionIds);
+  const out: Record<string, string[]> = {};
+  for (const r of (data ?? []) as { section_id: string; profile_id: string }[]) {
+    (out[r.section_id] ??= []).push(r.profile_id);
+  }
+  return out;
+}

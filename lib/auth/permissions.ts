@@ -56,6 +56,7 @@ export const ROLE_LABELS: Record<SchoolRole, string> = {
   cashier: "Cashier",
   treasurer: "Treasurer",
   viewer: "Viewer",
+  teacher: "Teacher",
 };
 
 export const ROLE_DESCRIPTIONS: Record<SchoolRole, string> = {
@@ -63,4 +64,6 @@ export const ROLE_DESCRIPTIONS: Record<SchoolRole, string> = {
   cashier: "Records payments and prints receipts. Cannot void.",
   treasurer: "Reviews collections, runs reports, and may void payments.",
   viewer: "Read-only access to students, payments and reports.",
+  teacher:
+    "Sees gate attendance for the sections assigned to them, and nothing else. Assign sections under Administration → Sections.",
 };

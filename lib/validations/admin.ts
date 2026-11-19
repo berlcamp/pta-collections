@@ -34,7 +34,7 @@ export const sectionSchema = z.object({
 export const inviteSchema = z.object({
   email: z.email("Enter a valid email address."),
   full_name: z.string().trim().min(2, "Enter the person's name."),
-  role: z.enum(["admin", "cashier", "treasurer", "viewer"]),
+  role: z.enum(["admin", "cashier", "treasurer", "viewer", "teacher"]),
 });
 
 export const membershipStatusSchema = z.object({

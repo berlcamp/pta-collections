@@ -24,6 +24,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const lightOnly =
     pathname === "/cashier" ||
     pathname.startsWith("/cashier/") ||
+    pathname === "/teacher" ||
+    pathname.startsWith("/teacher/") ||
     pathname === "/portal" ||
     pathname.startsWith("/portal/");
 

@@ -22,6 +22,12 @@ export default async function AppLayout({
   if (session.activeRole === "cashier" && !session.isSuperAdmin) {
     redirect("/cashier");
   }
+  // Likewise a teacher's whole workspace is /teacher (0030): their account
+  // reads nothing of the school through RLS, so every other screen would be
+  // empty at best.
+  if (session.activeRole === "teacher" && !session.isSuperAdmin) {
+    redirect("/teacher");
+  }
 
   return <AppShell session={session}>{children}</AppShell>;
 }

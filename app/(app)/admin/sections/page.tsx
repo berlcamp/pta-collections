@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/auth/session";
 import {
   getGradeLevels,
   getSchoolYears,
+  getSchoolTeachers,
+  getSectionTeacherIds,
   getSections,
   resolveSchoolYear,
 } from "@/lib/data/school";
@@ -35,7 +37,14 @@ export default async function SectionsPage({
     );
   }
 
-  const sections = await getSections(ctx.activeSchool.id, schoolYear.id);
+  const [sections, teachers] = await Promise.all([
+    getSections(ctx.activeSchool.id, schoolYear.id),
+    getSchoolTeachers(ctx.activeSchool.id),
+  ]);
+  const assignments = await getSectionTeacherIds(
+    ctx.activeSchool.id,
+    sections.map((s) => s.id),
+  );
 
   return (
     <>
@@ -48,6 +57,8 @@ export default async function SectionsPage({
         gradeLevels={gradeLevels}
         schoolYears={schoolYears}
         currentYearId={schoolYear.id}
+        teachers={teachers}
+        assignments={assignments}
       />
     </>
   );

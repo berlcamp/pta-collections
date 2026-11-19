@@ -2,11 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionContext } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
-import { resolveSchoolYear } from "@/lib/data/school";
+import { getSections, resolveSchoolYear } from "@/lib/data/school";
 import {
   attendanceWindow,
   getAttendanceDays,
   getAttendanceStudents,
+  scopeStudents,
 } from "@/lib/data/attendance";
 import {
   getAnnualReport,
@@ -294,10 +295,19 @@ export async function GET(
         filters.to,
         todayInTimezone(ctx.activeSchool.timezone),
       );
-      const [days, students] = await Promise.all([
-        getAttendanceDays(ctx.activeSchool.id, from, to),
+      // The same grade/section narrowing as the page (0030).
+      const sections = await getSections(ctx.activeSchool.id, schoolYear.id);
+      const section = sections.find((x) => x.id === sp.get("section")) ?? null;
+      const gradeLevel = section?.grade_level ?? sp.get("grade") ?? null;
+      const [days, allStudents] = await Promise.all([
+        getAttendanceDays(ctx.activeSchool.id, from, to, {
+          schoolYearId: schoolYear.id,
+          gradeLevel,
+          sectionId: section?.id ?? null,
+        }),
         getAttendanceStudents(ctx.activeSchool.id, schoolYear.id, from, to),
       ]);
+      const students = scopeStudents(allStudents, gradeLevel, section);
       const schoolDays = days.length;
 
       // One file, two blocks, the same shape as the annual report: the daily

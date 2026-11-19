@@ -63,18 +63,36 @@ export function attendanceWindow(
   return { from: start, to: end < start ? start : end };
 }
 
+/** A grade and/or section the report is narrowed to (0030). */
+export interface AttendanceScope {
+  schoolYearId: string;
+  gradeLevel?: string | null;
+  sectionId?: string | null;
+}
+
 export async function getAttendanceDays(
   schoolId: string,
   from: string,
   to: string,
+  scope?: AttendanceScope,
 ): Promise<AttendanceDay[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("attendance_day_summary", {
-    p_school_id: schoolId,
-    p_from: from,
-    p_to: to,
-  });
-  assertDeployed(error, "attendance_day_summary");
+  const scoped = Boolean(scope && (scope.gradeLevel || scope.sectionId));
+  const { data, error } = scoped
+    ? await supabase.rpc("attendance_day_summary_scoped", {
+        p_school_id: schoolId,
+        p_school_year_id: scope!.schoolYearId,
+        p_from: from,
+        p_to: to,
+        p_grade_level: scope!.gradeLevel || null,
+        p_section_id: scope!.sectionId || null,
+      })
+    : await supabase.rpc("attendance_day_summary", {
+        p_school_id: schoolId,
+        p_from: from,
+        p_to: to,
+      });
+  assertDeployed(error, scoped ? "attendance_day_summary_scoped" : "attendance_day_summary");
 
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     local_date: r.local_date as string,
@@ -247,4 +265,21 @@ export async function getLiveStudentCard(
     .maybeSingle();
 
   return (data as { card_uid: string; issued_at: string } | null) ?? null;
+}
+
+/**
+ * The student roll narrowed to a grade and/or section. Section names are
+ * unique within a grade and year, so grade + name identifies the section the
+ * summary reports by name.
+ */
+export function scopeStudents<T extends { grade_level: string | null; section_name: string | null }>(
+  students: T[],
+  gradeLevel: string | null | undefined,
+  section: { grade_level: string; name: string } | null | undefined,
+): T[] {
+  return students.filter(
+    (s) =>
+      (!gradeLevel || s.grade_level === gradeLevel) &&
+      (!section || (s.grade_level === section.grade_level && s.section_name === section.name)),
+  );
 }

@@ -454,6 +454,29 @@ and redefines `assess_fees_scoped()`.
   charge doesn't count.
 - **Duplicate parent records split a family**, so merge them (0027) first.
 
+### A teacher reads NOTHING through RLS
+`0030_teachers.sql` adds the `teacher` role, `pta.section_teachers`, and
+`/teacher` (`app/(teacher)/`), the cashier desk's look for gate attendance.
+
+- **`current_school_ids()` leaves teacher memberships out.** 47 policies read
+  through it, and the anon key is public. An ordinary membership would let any
+  adviser pull the fee ledger and every parent's phone number straight from the
+  API. A teacher can read only their own `school_users` row and their school's
+  row (via `member_school_ids()` in `schools_read`).
+- **Every teacher read is a SECURITY DEFINER function that checks the
+  section:** `teacher_sections()`, `section_attendance_day()` and
+  `section_attendance_summary()`, gated by `require_section_access()`, which
+  allows an assigned active teacher or an admin of that school. Do not give a
+  teacher a policy. Add a checked function instead.
+- **Assignment is per section, and so per school year.** Admin only, and only
+  for a profile with an active teacher membership (RLS `with check`). Teachers
+  are assigned in the Sections modal.
+- `app/(app)/layout.tsx` sends a teacher to `/teacher` as it sends a cashier to
+  `/cashier`. Light only, forced in `theme-provider.tsx`.
+- Reports → Attendance filters by grade/section through
+  `attendance_day_summary_scoped()`. Unknown cards belong to no grade, so they
+  count only unfiltered.
+
 ### Architecture invariants
 - Reads go through the RLS-bound user client. Money/identity writes go through
   `SECURITY DEFINER` RPCs in `pta`. Never write `payments` or `donations` from
