@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { dynamicRoute } from "@/lib/routes";
-import { BookUser, Loader2, Plus } from "lucide-react";
+import { BookUser, Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,6 +58,8 @@ export function SectionManager({
   const router = useRouter();
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
+  // The section being renamed; null while creating a new one.
+  const [editing, setEditing] = useState<Section | null>(null);
   const [pending, startTransition] = useTransition();
 
   const form = useForm<SectionValues>({
@@ -82,19 +84,37 @@ export function SectionManager({
     router.push(dynamicRoute(`/admin/sections?${next.toString()}`));
   }
 
+  function openNew() {
+    setEditing(null);
+    form.reset({ grade_level: gradeLevels[0]?.code ?? "Grade 7", name: "" });
+    setOpen(true);
+  }
+
+  function openEdit(section: Section) {
+    setEditing(section);
+    form.reset({ grade_level: section.grade_level, name: section.name });
+    setOpen(true);
+  }
+
   function onSubmit(values: SectionValues) {
     startTransition(async () => {
       const res = await saveSection({
+        id: editing?.id,
         school_year_id: currentYearId,
         ...values,
+        // A section's grade is fixed once created: its students are enrolled
+        // in that grade, and moving the section would leave each of them in
+        // a section of a grade they are not in.
+        grade_level: editing ? editing.grade_level : values.grade_level,
       });
       if (!res.ok) {
         // A duplicate section name within a grade is the database's call.
         form.setError("name", { message: res.error });
         return;
       }
-      toast.success("Section created.");
+      toast.success(editing ? "Section renamed." : "Section created.");
       setOpen(false);
+      setEditing(null);
       form.reset();
       router.refresh();
     });
@@ -115,7 +135,7 @@ export function SectionManager({
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={() => setOpen(true)}>
+        <Button onClick={openNew}>
           <Plus className="size-4" />
           New section
         </Button>
@@ -126,7 +146,7 @@ export function SectionManager({
           icon={BookUser}
           title="No sections yet"
           description="Add the sections for this school year, or let the CSV importer propose them during an import."
-          action={<Button onClick={() => setOpen(true)}>Add a section</Button>}
+          action={<Button onClick={openNew}>Add a section</Button>}
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -136,9 +156,21 @@ export function SectionManager({
                 <p className="mb-2 text-sm font-semibold">{g.label}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {items.map((s) => (
-                    <Badge key={s.id} variant="secondary">
-                      {s.name}
-                    </Badge>
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => openEdit(s)}
+                      aria-label={`Edit ${g.label} ${s.name}`}
+                      className="group rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 transition-colors group-hover:bg-primary/10"
+                      >
+                        {s.name}
+                        <Pencil className="size-3 opacity-50 group-hover:opacity-100" />
+                      </Badge>
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -151,12 +183,15 @@ export function SectionManager({
         open={open}
         onOpenChange={(v) => {
           setOpen(v);
-          if (!v) form.reset();
+          if (!v) {
+            form.reset();
+            setEditing(null);
+          }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New section</DialogTitle>
+            <DialogTitle>{editing ? "Edit section" : "New section"}</DialogTitle>
           </DialogHeader>
 
           <Form {...form}>
@@ -173,7 +208,11 @@ export function SectionManager({
                     <FormLabel>
                       Grade level <RequiredMark />
                     </FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={Boolean(editing)}
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue />
@@ -187,6 +226,12 @@ export function SectionManager({
                         ))}
                       </SelectContent>
                     </Select>
+                    {editing && (
+                      <p className="text-xs text-muted-foreground">
+                        A section stays in its grade. To move students, change
+                        their enrollment instead.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -222,7 +267,7 @@ export function SectionManager({
                 </Button>
                 <Button type="submit" disabled={pending}>
                   {pending && <Loader2 className="size-4 animate-spin" />}
-                  Create section
+                  {editing ? "Save" : "Create section"}
                 </Button>
               </DialogFooter>
             </form>

@@ -16,7 +16,6 @@ import { PageHeader, SectionHeader } from "@/components/common/page-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { ProgramProgressCard } from "@/components/donations/program-progress";
 import { PledgeDialog } from "@/components/donations/pledge-dialog";
-import { CancelPledgeDialog } from "@/components/donations/cancel-pledge-dialog";
 import { PledgesTable } from "@/components/tables/pledges-table";
 import {
   DonationsTable,
@@ -145,17 +144,7 @@ export default async function ProgramDetailPage({
             rows={pledges}
             timezone={ctx.activeSchool.timezone}
             showProgram={false}
-            rowActions={
-              canCancelPledge
-                ? (p) =>
-                    p.status === "open" ? (
-                      <CancelPledgeDialog
-                        pledgeId={p.id}
-                        donorName={p.donor_name}
-                      />
-                    ) : null
-                : undefined
-            }
+            canCancel={canCancelPledge}
           />
         )}
       </section>

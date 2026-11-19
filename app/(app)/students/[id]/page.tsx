@@ -15,8 +15,15 @@ import {
 } from "lucide-react";
 import { requireSchool } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
-import { getSchoolYears, resolveSchoolYear } from "@/lib/data/school";
-import { getStudentProfile } from "@/lib/data/students";
+import {
+  getGradeLevels,
+  getSchoolYears,
+  getSections,
+  resolveSchoolYear,
+} from "@/lib/data/school";
+import { getStudentProfile, getStudentRow } from "@/lib/data/students";
+import { EditStudentButton } from "@/components/students/student-manager";
+import type { StudentRow } from "@/components/tables/students-table";
 import {
   attendanceWindow,
   getLiveStudentCard,
@@ -82,7 +89,14 @@ export default async function StudentProfilePage({
   ]);
   if (!schoolYear) notFound();
 
-  const profile = await getStudentProfile(id, ctx.activeSchool.id, schoolYear.id);
+  const canManage = can(ctx.activeRole, "manageStudents");
+  const [profile, editRow, gradeLevels, sections] = await Promise.all([
+    getStudentProfile(id, ctx.activeSchool.id, schoolYear.id),
+    // The edit dialog's inputs, fetched only for someone who may edit.
+    canManage ? getStudentRow(ctx.activeSchool.id, schoolYear.id, id) : null,
+    canManage ? getGradeLevels() : [],
+    canManage ? getSections(ctx.activeSchool.id, schoolYear.id) : [],
+  ]);
   if (!profile) notFound();
 
   const { student, enrollment, guardians, charges, payments, totals } = profile;
@@ -122,7 +136,15 @@ export default async function StudentProfilePage({
         actions={
           <>
             <SchoolYearPicker years={schoolYears} current={schoolYear.id} />
-            {can(ctx.activeRole, "manageStudents") && (
+            {editRow && (
+              <EditStudentButton
+                row={editRow as StudentRow}
+                schoolYearId={schoolYear.id}
+                gradeLevels={gradeLevels}
+                sections={sections}
+              />
+            )}
+            {canManage && (
               // Same parent, pre-linked: the fastest way to register a family
               // as one, and the one that cannot fork its parent record.
               <Button asChild variant="outline">

@@ -154,6 +154,48 @@ export async function searchStudents(opts: {
 }
 
 /**
+ * One student as a roll row — the shape the edit dialog takes — for the
+ * student's own page. Null when they have no enrollment in that year (the
+ * dialog edits a student AND their enrollment, so there is nothing to edit).
+ */
+export async function getStudentRow(
+  schoolId: string,
+  schoolYearId: string,
+  studentId: string,
+): Promise<StudentSearchResult | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("v_student_payment_status")
+    .select("*")
+    .eq("school_id", schoolId)
+    .eq("school_year_id", schoolYearId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (!data) return null;
+
+  const r = data as Record<string, unknown>;
+  const d = (await studentRowDetails(supabase, [studentId], schoolYearId)).get(studentId);
+  return {
+    student_id: studentId,
+    first_name: r.first_name as string,
+    middle_name: r.middle_name as string | null,
+    last_name: r.last_name as string,
+    suffix: r.suffix as string | null,
+    student_status: r.student_status as string,
+    grade_level: r.grade_level as string,
+    section_name: r.section_name as string | null,
+    student_number: r.student_number as string | null,
+    outstanding: Number(r.outstanding ?? 0),
+    primary_guardian_name: d?.guardian ? formatNameListing(d.guardian) : null,
+    lrn: d?.lrn ?? null,
+    birth_date: d?.birth_date ?? null,
+    sex: d?.sex ?? null,
+    section_id: d?.section_id ?? null,
+    guardian: d?.guardian ?? null,
+  };
+}
+
+/**
  * How many off-view matches (guardian name, LRN) a search may fold in.
  *
  * Each one costs ~37 characters of query string, so this is a URL budget as

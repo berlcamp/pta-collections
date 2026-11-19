@@ -10,7 +10,6 @@ import { StatCard } from "@/components/common/stat-card";
 import { SchoolYearPicker } from "@/components/common/school-year-picker";
 import { PledgesTable } from "@/components/tables/pledges-table";
 import { PledgeDialog } from "@/components/donations/pledge-dialog";
-import { CancelPledgeDialog } from "@/components/donations/cancel-pledge-dialog";
 import { formatMoney } from "@/lib/financial/money";
 
 export const dynamic = "force-dynamic";
@@ -108,14 +107,7 @@ export default async function PledgesPage({
         <PledgesTable
           rows={pledges}
           timezone={ctx.activeSchool.timezone}
-          rowActions={
-            canCancel
-              ? (p) =>
-                  p.status === "open" ? (
-                    <CancelPledgeDialog pledgeId={p.id} donorName={p.donor_name} />
-                  ) : null
-              : undefined
-          }
+          canCancel={canCancel}
         />
       )}
     </>

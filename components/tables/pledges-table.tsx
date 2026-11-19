@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { CancelPledgeDialog } from "@/components/donations/cancel-pledge-dialog";
 
 import { DataTable, SortableHeader } from "@/components/common/data-table";
 import { MoneyDisplay } from "@/components/common/money-display";
@@ -43,13 +44,18 @@ export function PledgesTable({
   rows,
   timezone,
   showProgram = true,
-  rowActions,
+  canCancel = false,
 }: {
   rows: PledgeStatusRow[];
   timezone: string;
   showProgram?: boolean;
-  /** Rendered at the end of each row — the cancel dialog, when permitted. */
-  rowActions?: (pledge: PledgeStatusRow) => React.ReactNode;
+  /**
+   * Show Cancel on open pledges. A flag, not a render callback: the pages
+   * that use this table are server components, and a function cannot cross
+   * into a client component — passing one is what took /donations/programs/[id]
+   * down whenever the program had a pledge.
+   */
+  canCancel?: boolean;
 }) {
   const columns: ColumnDef<PledgeStatusRow>[] = [
     {
@@ -157,7 +163,7 @@ export function PledgesTable({
       },
       filterFn: "equalsString",
     },
-    ...(rowActions
+    ...(canCancel
       ? [
           {
             id: "actions",
@@ -165,7 +171,14 @@ export function PledgesTable({
             enableHiding: false,
             enableSorting: false,
             cell: ({ row }) => (
-              <div className="flex justify-end">{rowActions(row.original)}</div>
+              <div className="flex justify-end">
+                {row.original.status === "open" && (
+                  <CancelPledgeDialog
+                    pledgeId={row.original.id}
+                    donorName={row.original.donor_name}
+                  />
+                )}
+              </div>
             ),
           } as ColumnDef<PledgeStatusRow>,
         ]

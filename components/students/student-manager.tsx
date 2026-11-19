@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, Pencil, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -90,6 +90,41 @@ export function StudentManager({
         sections={sections}
         onOpenChange={(open) => {
           if (!open) setEditing(null);
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * "Edit details" on a student's own page: the same dialog the roll uses, so
+ * the two can never disagree about what is editable or how it is saved.
+ */
+export function EditStudentButton({
+  row,
+  schoolYearId,
+  gradeLevels,
+  sections,
+}: {
+  row: StudentRow;
+  schoolYearId: string;
+  gradeLevels: GradeLevel[];
+  sections: Section[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="outline" onClick={() => setOpen(true)}>
+        <Pencil className="size-4" />
+        Edit details
+      </Button>
+      <EditStudentDialog
+        row={open ? row : null}
+        schoolYearId={schoolYearId}
+        gradeLevels={gradeLevels}
+        sections={sections}
+        onOpenChange={(v) => {
+          if (!v) setOpen(false);
         }}
       />
     </>
