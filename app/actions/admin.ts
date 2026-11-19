@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireSchool, requireSession } from "@/lib/auth/session";
-import { can } from "@/lib/auth/permissions";
+import { can, ROLE_LABELS } from "@/lib/auth/permissions";
 import {
   inviteSchema,
   membershipStatusSchema,
@@ -16,6 +16,7 @@ import {
 import { z } from "zod";
 import { dbId } from "@/lib/validations/id";
 import type { ActionResult } from "./types";
+import type { SchoolRole } from "@/types/database.types";
 
 export async function saveSchoolYear(input: unknown): Promise<ActionResult> {
   const ctx = await requireSchool();
@@ -161,7 +162,16 @@ export async function setSectionTeachers(input: unknown): Promise<ActionResult> 
   return { ok: true, data: undefined };
 }
 
-export async function inviteUser(input: unknown): Promise<ActionResult> {
+/**
+ * What an invite would do to someone already in THIS school. Inviting an
+ * existing member is not a second role — a person holds one membership per
+ * school — so it would silently replace their role. The dialog asks first.
+ */
+export type InviteOutcome =
+  | { ok: true; data: undefined }
+  | { ok: false; error: string; confirm?: { name: string; currentRole: string } };
+
+export async function inviteUser(input: unknown): Promise<InviteOutcome> {
   const ctx = await requireSchool();
   if (!can(ctx.activeRole, "manageUsers")) {
     return { ok: false, error: "Only an administrator can invite users." };
@@ -173,6 +183,36 @@ export async function inviteUser(input: unknown): Promise<ActionResult> {
   }
 
   const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("school_users")
+    .select("role, status, profile:profiles!inner(full_name, email)")
+    .eq("school_id", ctx.activeSchool.id)
+    .eq("profile.email", parsed.data.email.trim().toLowerCase())
+    .maybeSingle();
+  const member = existing as unknown as {
+    role: SchoolRole;
+    status: "active" | "inactive";
+    profile: { full_name: string; email: string };
+  } | null;
+
+  if (member) {
+    const name = member.profile.full_name || member.profile.email;
+    if (member.role === parsed.data.role && member.status === "active") {
+      return {
+        ok: false,
+        error: `${name} is already a ${ROLE_LABELS[member.role]} at this school.`,
+      };
+    }
+    if (member.role !== parsed.data.role && !parsed.data.confirmRoleChange) {
+      return {
+        ok: false,
+        error: `${name} is already a ${ROLE_LABELS[member.role]} at this school.`,
+        confirm: { name, currentRole: ROLE_LABELS[member.role] },
+      };
+    }
+  }
+
   const { error } =
     parsed.data.role === "teacher"
       ? // A teacher's sections ride on the invite and are applied when they

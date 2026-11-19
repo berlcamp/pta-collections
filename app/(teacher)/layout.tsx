@@ -1,6 +1,8 @@
 import { requireRole } from "@/lib/auth/session";
 import { TeacherNav } from "@/components/teacher/teacher-nav";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { WorkspaceSchoolSwitcher } from "@/components/layout/workspace-school-switcher";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
 
 /** Tenant-scoped and authenticated, the same as the (app) group (D20). */
 export const dynamic = "force-dynamic";
@@ -27,6 +29,14 @@ export default async function TeacherLayout({
           <TeacherNav />
 
           <div className="ml-auto flex items-center gap-2">
+            <WorkspaceSchoolSwitcher
+              current={session.activeSchool.id}
+              schools={session.memberships.map((m) => ({
+                id: m.school_id,
+                name: m.school.name,
+                role: ROLE_LABELS[m.role],
+              }))}
+            />
             <span className="hidden text-sm font-medium text-blue-100 md:inline">
               {session.profile.full_name}
             </span>

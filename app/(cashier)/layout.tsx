@@ -2,6 +2,8 @@ import { requireRole } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { CashierNav } from "@/components/cashier/cashier-nav";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { WorkspaceSchoolSwitcher } from "@/components/layout/workspace-school-switcher";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
 
 /** Tenant-scoped and authenticated, the same as the (app) group (D20). */
 export const dynamic = "force-dynamic";
@@ -40,6 +42,14 @@ export default async function CashierLayout({
           <CashierNav pendingClaims={count ?? 0} />
 
           <div className="ml-auto flex items-center gap-2">
+            <WorkspaceSchoolSwitcher
+              current={session.activeSchool.id}
+              schools={session.memberships.map((m) => ({
+                id: m.school_id,
+                name: m.school.name,
+                role: ROLE_LABELS[m.role],
+              }))}
+            />
             <span className="hidden text-sm font-medium text-blue-100 md:inline">
               {session.profile.full_name}
             </span>
@@ -57,9 +67,9 @@ export default async function CashierLayout({
         </div>
       </main>
 
-      {/* The school is named once, quietly, down here: the desk serves one
-          school and the cashier knows which. There is deliberately no school
-          switcher on this desk. */}
+      {/* The school is named once, quietly, down here. A cashier with one
+          school sees no switcher; one who works at several gets the pill in
+          the bar above. */}
       <footer className="pb-5 text-center text-xs text-blue-100/80">
         {session.activeSchool.name}
       </footer>
