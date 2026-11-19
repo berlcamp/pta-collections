@@ -12,8 +12,13 @@ export interface MemberRow {
   name: string;
   email: string;
   role_label: string;
-  status: "active" | "inactive";
+  /** "invited" is a pending invitation, not yet a membership. */
+  status: "active" | "inactive" | "invited";
   added: string;
+  /** When they last signed in; null = never (or an invite). */
+  last_signed_in: string | null;
+  /** For sorting by last sign-in; null sorts as oldest. */
+  last_signed_in_at: string | null;
   isSelf: boolean;
 }
 
@@ -63,13 +68,28 @@ const columns: ColumnDef<MemberRow>[] = [
           "capitalize",
           row.original.status === "active"
             ? "border-success/25 bg-success/10 text-success"
-            : "text-muted-foreground",
+            : row.original.status === "invited"
+              ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+              : "text-muted-foreground",
         )}
       >
         {row.original.status}
       </Badge>
     ),
     filterFn: "equalsString",
+  },
+  {
+    id: "last_signed_in",
+    accessorFn: (r) => r.last_signed_in_at ?? "",
+    meta: { label: "Last signed in" },
+    header: ({ column }) => <SortableHeader column={column} title="Last signed in" />,
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-muted-foreground">
+        {row.original.status === "invited"
+          ? "Not yet"
+          : (row.original.last_signed_in ?? "Never")}
+      </span>
+    ),
   },
   {
     accessorKey: "added",
@@ -87,7 +107,7 @@ const columns: ColumnDef<MemberRow>[] = [
     enableHiding: false,
     enableSorting: false,
     cell: ({ row }) =>
-      row.original.isSelf ? null : (
+      row.original.isSelf || row.original.status === "invited" ? null : (
         <div className="text-right">
           <MembershipToggle
             schoolUserId={row.original.id}
@@ -119,6 +139,7 @@ export function UsersTable({ rows }: { rows: MemberRow[] }) {
           title: "Statuses",
           options: [
             { value: "active", label: "Active" },
+            { value: "invited", label: "Invited" },
             { value: "inactive", label: "Inactive" },
           ],
         },
