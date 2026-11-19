@@ -470,7 +470,10 @@ and redefines `assess_fees_scoped()`.
   teacher a policy. Add a checked function instead.
 - **Assignment is per section, and so per school year.** Admin only, and only
   for a profile with an active teacher membership (RLS `with check`). Teachers
-  are assigned in the Sections modal.
+  are assigned in the Sections modal, or on the invite itself:
+  `pta.invite_teacher()` (0031) stores `section_ids` on the invite. A trigger on
+  the invite's change to `accepted` applies them, covering both an immediate
+  accept and a later first sign-in, without redefining `claim_invite()`.
 - `app/(app)/layout.tsx` sends a teacher to `/teacher` as it sends a cashier to
   `/cashier`. Light only, forced in `theme-provider.tsx`.
 - Reports → Attendance filters by grade/section through

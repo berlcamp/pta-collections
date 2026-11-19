@@ -8,6 +8,7 @@ import { InvitesTable, UsersTable } from "@/components/tables/users-table";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/utils/dates";
 import { InviteUserDialog } from "@/components/admin/invite-user-dialog";
+import { getActiveSchoolYear, getSections } from "@/lib/data/school";
 import type { SchoolRole } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,15 @@ export const dynamic = "force-dynamic";
 export default async function UsersPage() {
   const ctx = await requireRole(["admin"]);
   const supabase = await createClient();
+
+  const activeYear = await getActiveSchoolYear(ctx.activeSchool.id);
+  // A teacher's sections can be chosen on the invite (0031): this year's.
+  const sections = activeYear ? await getSections(ctx.activeSchool.id, activeYear.id) : [];
+  const sectionOptions = sections.map((s) => ({
+    id: s.id,
+    name: s.name,
+    grade_level: s.grade_level,
+  }));
 
   const [membersRes, invitesRes] = await Promise.all([
     supabase
@@ -51,7 +61,7 @@ export default async function UsersPage() {
       <PageHeader
         title="Users"
         description="Access is by invitation only. Deactivating someone takes effect on their next request."
-        actions={<InviteUserDialog />}
+        actions={<InviteUserDialog sections={sectionOptions} />}
       />
 
       {members.length === 0 ? (
@@ -59,7 +69,7 @@ export default async function UsersPage() {
           icon={Users}
           title="No users yet"
           description="Invite a cashier, treasurer or viewer to this school."
-          action={<InviteUserDialog />}
+          action={<InviteUserDialog sections={sectionOptions} />}
         />
       ) : (
         <UsersTable

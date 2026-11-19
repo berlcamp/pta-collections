@@ -39,11 +39,17 @@ import {
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/auth/permissions";
 import { inviteSchema } from "@/lib/validations/admin";
 import { inviteUser } from "@/app/actions/admin";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { SchoolRole } from "@/types/database.types";
 
 type InviteValues = z.infer<typeof inviteSchema>;
 
-export function InviteUserDialog() {
+export function InviteUserDialog({
+  sections = [],
+}: {
+  /** This school year's sections, offered when inviting a teacher. */
+  sections?: { id: string; name: string; grade_level: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -53,14 +59,17 @@ export function InviteUserDialog() {
     // Validate once the field has been touched, then live as they correct it —
     // messages never appear while someone is still typing their first attempt.
     mode: "onTouched",
-    defaultValues: { email: "", full_name: "", role: "cashier" },
+    defaultValues: { email: "", full_name: "", role: "cashier", sectionIds: [] },
   });
 
   const role = form.watch("role");
 
   function onSubmit(values: InviteValues) {
     startTransition(async () => {
-      const res = await inviteUser(values);
+      const res = await inviteUser({
+        ...values,
+        sectionIds: values.role === "teacher" ? (values.sectionIds ?? []) : undefined,
+      });
       if (!res.ok) {
         // The server re-validates independently; surface its verdict on the
         // field it belongs to rather than as an anonymous toast.
@@ -165,6 +174,67 @@ export function InviteUserDialog() {
                 </FormItem>
               )}
             />
+
+            {role === "teacher" && (
+              <FormField
+                control={form.control}
+                name="sectionIds"
+                render={({ field }) => {
+                  const value = field.value ?? [];
+                  const grades = [...new Set(sections.map((s) => s.grade_level))];
+                  return (
+                    <FormItem>
+                      <FormLabel>Sections</FormLabel>
+                      {sections.length === 0 ? (
+                        <FormDescription>
+                          This school year has no sections yet. Add them under
+                          Administration → Sections, then assign the teacher there.
+                        </FormDescription>
+                      ) : (
+                        <>
+                          <div className="max-h-56 space-y-3 overflow-y-auto rounded-lg border p-3">
+                            {grades.map((g) => (
+                              <div key={g}>
+                                <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                  {g}
+                                </p>
+                                <div className="grid gap-1 sm:grid-cols-2">
+                                  {sections
+                                    .filter((s) => s.grade_level === g)
+                                    .map((s) => (
+                                      <label
+                                        key={s.id}
+                                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
+                                      >
+                                        <Checkbox
+                                          checked={value.includes(s.id)}
+                                          onCheckedChange={(v) =>
+                                            field.onChange(
+                                              v
+                                                ? [...value, s.id]
+                                                : value.filter((x) => x !== s.id),
+                                            )
+                                          }
+                                        />
+                                        {s.name}
+                                      </label>
+                                    ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <FormDescription>
+                            Applied when they first sign in. You can change it
+                            later under Administration → Sections.
+                          </FormDescription>
+                        </>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+            )}
 
             <DialogFooter>
               <Button

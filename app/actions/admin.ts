@@ -173,16 +173,27 @@ export async function inviteUser(input: unknown): Promise<ActionResult> {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("invite_school_user", {
-    p_school_id: ctx.activeSchool.id,
-    p_email: parsed.data.email,
-    p_full_name: parsed.data.full_name,
-    p_role: parsed.data.role,
-  });
+  const { error } =
+    parsed.data.role === "teacher"
+      ? // A teacher's sections ride on the invite and are applied when they
+        // first sign in — or at once if they already have an account (0031).
+        await supabase.rpc("invite_teacher", {
+          p_school_id: ctx.activeSchool.id,
+          p_email: parsed.data.email,
+          p_full_name: parsed.data.full_name,
+          p_section_ids: parsed.data.sectionIds ?? [],
+        })
+      : await supabase.rpc("invite_school_user", {
+          p_school_id: ctx.activeSchool.id,
+          p_email: parsed.data.email,
+          p_full_name: parsed.data.full_name,
+          p_role: parsed.data.role,
+        });
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/admin/users");
+  revalidatePath("/admin/sections");
   return { ok: true, data: undefined };
 }
 

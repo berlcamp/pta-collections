@@ -35,6 +35,9 @@ export const inviteSchema = z.object({
   email: z.email("Enter a valid email address."),
   full_name: z.string().trim().min(2, "Enter the person's name."),
   role: z.enum(["admin", "cashier", "treasurer", "viewer", "teacher"]),
+  /** For a teacher: the sections they advise, applied when the invite is
+   *  accepted (0031). Ignored for every other role. */
+  sectionIds: z.array(dbId()).max(20).optional(),
 });
 
 export const membershipStatusSchema = z.object({
